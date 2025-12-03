@@ -1,6 +1,6 @@
 # What?
 
-Pet project. Backend API server for twitch-like (livestreaming) app. Part of the \<TODO: insert repo\>
+Pet project. Backend API server for twitch-like (livestreaming) app. Part of the twitch-clone project.
 
 # Why?
 
@@ -10,10 +10,10 @@ Practice.
 
 * haproxy load balancer
 * swagger docs
-* postgres 2 instances: 1 read, 1 write
 * redis
 * docker
 * sqlc
+* grpc client
 
 # How to run?
 1. remove .example suffix for:
@@ -23,7 +23,7 @@ Practice.
 
 2. for "production" run*:
 ```sh
-make dockup
+make up
 ```
 
 3. for local dev run*:
@@ -35,11 +35,3 @@ go run ./cmd/server
 ```
 go run ./cmd/setup
 ```
-
-\* to simulate activity run:
-```sh
-go run ./cmd/fakeusers
-```
-
-# License
-))
