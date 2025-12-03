@@ -1,0 +1,107 @@
+name: twc-api
+services:
+  redis:
+    secrets:
+      - redis_password
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - twc-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  # command: ["redis-server", "--requirepass", "/run/secrets/redis_password"]
+
+
+  postgres:
+    image: postgres:latest
+    restart: always
+    secrets:
+      - postgres_password
+    environment:
+      POSTGRES_USER: less
+      POSTGRES_DB: twitchclone
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks:
+      - twc-network
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "less", "-d", "twitchclone"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8089"
+    secrets:
+      - postgres_password
+    environment:
+      POSTGRES_USER: less
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_NAME: twitchclone
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      API_PORT: 8089
+      ENV: local
+    volumes:
+      - ./static:/myfolder/static
+      - ./cmd/setup:/myfolder/cmd/setup
+      - ./deploy:/myfolder/deploy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - twc-network
+    entrypoint: /myfolder/deploy/docker-entrypoint.sh
+    deploy:
+      replicas: 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+
+  haproxy:
+    container_name: haproxy
+    image: haproxytech/haproxy-debian:latest
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    # TODO: currently health-check doesnt work so haproxy might need to be started manually
+    # depends_on:
+    #   server:
+    #     condition: service_healthy
+    networks:
+      - twc-network
+
+
+volumes:
+  pgdata:
+
+
+networks:
+  twc-network:
+
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  redis_password:
+    file: ./secrets/redis_password

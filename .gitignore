@@ -1,0 +1,7 @@
+TODO
+NOTE
+.env
+static/
+secrets/postgres_password
+secrets/redis_password
+*.exe

@@ -1,0 +1,75 @@
+version: "2"
+servers:
+- engine: postgresql
+  uri: "postgres://less:123@localhost:5432/twitchclone"
+sql:
+  - engine: "postgresql"
+    queries: "internal/endpoint/category/queries.category.sql"
+    database:
+      managed: true
+    schema: "internal/db/scripts/schema.sql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "pgx/v5"
+
+
+  - engine: "postgresql"
+    queries: "internal/endpoint/livestream/queries.livestream.sql"
+    database:
+      managed: true
+    schema: "internal/db/scripts/schema.sql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "pgx/v5"
+
+
+  - engine: "postgresql"
+    queries: "internal/endpoint/auth/queries.auth.sql"
+    database:
+      managed: true
+    schema: "internal/db/scripts/schema.sql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "pgx/v5"
+
+
+  - engine: "postgresql"
+    queries: "internal/endpoint/follow/queries.follow.sql"
+    database:
+      managed: true
+    schema: "internal/db/scripts/schema.sql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "pgx/v5"
+
+
+  - engine: "postgresql"
+    queries: "internal/endpoint/channel/queries.channel.sql"
+    database:
+      managed: true
+    schema: "internal/db/scripts/schema.sql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "pgx/v5"
+
+
+  - engine: "postgresql"
+    queries: "internal/endpoint/user/queries.user.sql"
+    database:
+      managed: true
+    schema: "internal/db/scripts/schema.sql"
+    gen:
+      go:
+        package: "db"
+        out: "internal/db"
+        sql_package: "pgx/v5"
