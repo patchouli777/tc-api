@@ -9,14 +9,12 @@ import (
 	"main/internal/endpoint/follow"
 	"main/internal/endpoint/health"
 	"main/internal/endpoint/livestream"
-	"main/internal/endpoint/presence"
 	"main/internal/endpoint/user"
 	"net/http"
 
 	_ "main/docs"
 
 	httpSwagger "github.com/swaggo/http-swagger"
-	"golang.org/x/net/websocket"
 )
 
 // @title           twitchclone api
@@ -33,13 +31,12 @@ import (
 // @externalDocs.url          https://swagger.io/resources/open-api/
 func addRoutes(mux *http.ServeMux,
 	log *slog.Logger,
-	lss livestream.Service,
 	cs category.Repository,
+	lss livestream.Service,
+	chs channel.Service,
 	as auth.Service,
 	fs follow.Service,
-	us user.Service,
-	wsServer *presence.Server,
-) {
+	us user.Service) {
 	// TODO: mock mw
 	var authMiddleware = authUtils.AuthMiddleware
 	apiMux := http.NewServeMux()
@@ -78,7 +75,7 @@ func addRoutes(mux *http.ServeMux,
 	apiMux.HandleFunc("PATCH /users/{username}", authMiddleware(log, userHandler.Patch))
 	apiMux.HandleFunc("DELETE /users/{username}", authMiddleware(log, userHandler.Delete))
 
-	channelHandler := channel.NewHandler(log, nil)
+	channelHandler := channel.NewHandler(log, chs)
 	apiMux.HandleFunc("GET /channels/{channel}", channelHandler.Get)
 	// apiMux.HandleFunc("POST /channels/{channel}", authMiddleware(log, channelHandler.Post))
 	apiMux.HandleFunc("PATCH /channels/{channel}", authMiddleware(log, channelHandler.Patch))
@@ -92,8 +89,4 @@ func addRoutes(mux *http.ServeMux,
 
 	fileserver := http.FileServer(http.Dir("./static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fileserver))
-
-	wsh := presence.NewHandler(wsServer)
-	mux.Handle("/ws", websocket.Handler(wsh))
-	mux.HandleFunc("POST /presence", websocket.Handler(wsh).ServeHTTP)
 }

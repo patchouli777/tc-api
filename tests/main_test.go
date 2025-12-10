@@ -141,6 +141,7 @@ func TestMain(m *testing.M) {
 
 	srvcs := app.InitServices(ctx, cfg.Log,
 		cfg.InstanceID.String(),
+		cfg.Env,
 		cfg.Update.LivestreamsTimer,
 		grpcClient,
 		rclient,

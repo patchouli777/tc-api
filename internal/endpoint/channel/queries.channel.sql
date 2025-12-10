@@ -6,6 +6,7 @@ SELECT
     is_partner,
     first_livestream,
     last_livestream,
+    offline_background AS background,
     avatar,
     description,
     links,

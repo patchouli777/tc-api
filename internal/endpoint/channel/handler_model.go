@@ -9,6 +9,7 @@ type GetResponse struct {
 	FirstLivestream time.Time `json:"first_livestream"`
 	LastLivestream  time.Time `json:"last_livestream"`
 	Description     string    `json:"description"`
+	Background      string    `json:"background"`
 	Links           []string  `json:"links"`
 	Tags            []string  `json:"tags"`
 }

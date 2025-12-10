@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"main/internal/endpoint/auth"
 	"main/internal/endpoint/category"
+	"main/internal/endpoint/channel"
 	"main/internal/endpoint/follow"
 	"main/internal/endpoint/livestream"
-	"main/internal/endpoint/presence"
 	"main/internal/endpoint/user"
 	"main/internal/lib/mw"
 	"main/internal/lib/sl"
@@ -37,6 +37,7 @@ func New(ctx context.Context, cfg Config) *http.Server {
 	srvcs := InitServices(ctx,
 		cfg.Log,
 		cfg.InstanceID.String(),
+		cfg.Env,
 		cfg.Update.LivestreamsTimer,
 		grpcClient,
 		rdb,
@@ -57,16 +58,15 @@ func New(ctx context.Context, cfg Config) *http.Server {
 func CreateHandler(ctx context.Context,
 	cfg Config,
 	srvcs Services) http.Handler {
-	go srvcs.Presence.Run(ctx, cfg.InstanceID, cfg.Update.LivestreamsTimer)
 
 	mux := http.NewServeMux()
 	addRoutes(mux, cfg.Log,
-		srvcs.Livestream,
 		srvcs.Category,
+		srvcs.Livestream,
+		srvcs.Channel,
 		srvcs.Auth,
 		srvcs.Follow,
-		srvcs.User,
-		srvcs.Presence)
+		srvcs.User)
 
 	// go update.UpdateCategories(updateCtx, log, upd.CategoriesTimer, cs, lsr)
 
@@ -78,29 +78,26 @@ type Services struct {
 	Livestream *livestream.ServiceImpl
 	Category   *category.RepositoryImpl
 	Follow     *follow.ServiceImpl
-	LsUpdater  *livestream.UpdaterImpl
 	User       *user.ServiceImpl
-	Presence   *presence.Server
+	Channel    *channel.ServiceImpl
 }
 
-func InitServices(
-	ctx context.Context,
+func InitServices(ctx context.Context,
 	log *slog.Logger,
 	instanceID string,
+	env string,
 	lsUpdateTimeout time.Duration,
 	grpcClient auth.GRPCCLient,
 	rdb *redis.Client,
 	pool *pgxpool.Pool) Services {
 	livestreamRepo := livestream.NewRepo(rdb, pool)
-	livestreamUpdaterRepo := livestream.NewUpdaterRepo(rdb)
-	// livestreamEventCh := make(chan livestream.EventLivestream)
-	livestreamUpdater := livestream.NewUpdater(rdb,
-		livestreamRepo,
-		livestreamUpdaterRepo,
-		// livestreamEventCh,
-		instanceID)
-	livestreamUpdater.Subscribe(ctx)
-	livestreamsService := livestream.NewService(log, livestreamRepo)
+	streamServerAdapter := NewStreamServerAdapter(log, env, rdb, livestreamRepo, instanceID)
+	// livestreamUpdater := livestream.NewUpdater(log)
+	livestreamsService := livestream.NewService(log, livestreamRepo, streamServerAdapter)
+	streamServerAdapter.Update(ctx)
+
+	channelDBAdapter := channel.NewAdapter(pool)
+	channelService := channel.NewService(log, channelDBAdapter)
 
 	categoryRepo := category.NewRepo(rdb, pool)
 
@@ -112,17 +109,13 @@ func InitServices(
 	userRepo := user.NewRepository(pool)
 	userService := user.NewService(log, userRepo)
 
-	viewerStore := presence.NewViewerStore(rdb)
-	wsServer := presence.NewServer(log, viewerStore)
-
 	return Services{
 		Auth:       authService,
 		Livestream: livestreamsService,
-		LsUpdater:  livestreamUpdater,
+		Channel:    channelService,
 		Category:   categoryRepo,
 		Follow:     followService,
-		User:       userService,
-		Presence:   wsServer}
+		User:       userService}
 }
 
 func NewGRPClient(log *slog.Logger, env string, cfg GrpcClientConfig) (auth.GRPCCLient, error) {
@@ -140,5 +133,20 @@ func NewGRPClient(log *slog.Logger, env string, cfg GrpcClientConfig) (auth.GRPC
 		log.Error(`failed to initialize grpc client due
 	to unknown value of "env" variable. Accepted values are: "prod", "dev", "local". Defaulting to mock. (big danger)`)
 		return &auth.GRPCClientMock{}, nil
+	}
+}
+
+func NewStreamServerAdapter(log *slog.Logger, env string, rdb *redis.Client,
+	lsr livestream.Repository, instanceId string) livestream.StreamServerAdapter {
+	switch env {
+	case envLocal:
+		log.Info("skipped initialization of stream server adapter because env is local or dev")
+		return livestream.NewStreamServerAdapterMock(log, rdb, lsr, instanceId)
+	case envProd:
+		return livestream.NewStreamServerAdapter(log, rdb, lsr, instanceId)
+	default:
+		log.Error(`failed to initialize stream server adapter due
+	to unknown value of "env" variable. Accepted values are: "prod", "dev", "local". Defaulting to mock. (big danger)`)
+		return livestream.NewStreamServerAdapterMock(log, rdb, lsr, instanceId)
 	}
 }

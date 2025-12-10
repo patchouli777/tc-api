@@ -25,13 +25,13 @@ type RepositoryImpl struct {
 	rdb  *redis.Client
 	pool *pgxpool.Pool
 	// set of livestream ids sorted by viewers
-	sorted sortedIDStore
+	sorted *sortedIDStore
 	// livestream store
-	store livestreamStore
+	store *livestreamStore
 	// map from username to livestream id
-	userMap userToIdStore
+	userMap *userToIdStore
 	// set of livestream ids
-	ids idStore
+	ids *idStore
 }
 
 func NewRepo(rdb *redis.Client, pool *pgxpool.Pool) *RepositoryImpl {
@@ -39,12 +39,13 @@ func NewRepo(rdb *redis.Client, pool *pgxpool.Pool) *RepositoryImpl {
 	store := livestreamStore{rdb: rdb}
 	userMap := userToIdStore{rdb: rdb}
 	ids := idStore{rdb: rdb}
+
 	return &RepositoryImpl{rdb: rdb,
 		pool:    pool,
-		sorted:  sorted,
-		store:   store,
-		userMap: userMap,
-		ids:     ids}
+		sorted:  &sorted,
+		store:   &store,
+		userMap: &userMap,
+		ids:     &ids}
 }
 
 func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Livestream, error) {

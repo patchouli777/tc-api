@@ -10,9 +10,9 @@ import (
 )
 
 type Service interface {
-	Get(ctx context.Context, username string) (Channel, error)
+	Get(ctx context.Context, username string) (*Channel, error)
 	Update(ctx context.Context, upd ChannelUpdate) error
-	Delete(ctx context.Context)
+	// Delete(ctx context.Context)
 }
 
 type Handler struct {
@@ -45,6 +45,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(GetResponse{
 		IsBanned:        chann.IsBanned,
 		IsPartner:       chann.IsPartner,
+		Background:      chann.Background,
 		FirstLivestream: chann.FirstLivestream,
 		LastLivestream:  chann.LastLivestream,
 		Description:     chann.Description,

@@ -135,20 +135,21 @@ type TcTag struct {
 }
 
 type TcUser struct {
-	ID              int32
-	Name            string
-	Password        string
-	CreatedAt       pgtype.Date
-	UpdatedAt       pgtype.Date
-	IsBanned        pgtype.Bool
-	IsPartner       pgtype.Bool
-	FirstLivestream pgtype.Date
-	LastLivestream  pgtype.Date
-	Avatar          pgtype.Text
-	Description     pgtype.Text
-	Links           []string
-	Tags            []string
-	AppRole         AppRoleEnum
+	ID                int32
+	Name              string
+	Password          string
+	CreatedAt         pgtype.Date
+	UpdatedAt         pgtype.Date
+	IsBanned          pgtype.Bool
+	IsPartner         pgtype.Bool
+	FirstLivestream   pgtype.Date
+	LastLivestream    pgtype.Date
+	Avatar            pgtype.Text
+	OfflineBackground string
+	Description       pgtype.Text
+	Links             []string
+	Tags              []string
+	AppRole           AppRoleEnum
 }
 
 type TcUserChatEvent struct {

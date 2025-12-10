@@ -2,30 +2,28 @@ package channel
 
 import (
 	"context"
-	"main/internal/db"
-
-	"github.com/jackc/pgx/v5/pgxpool"
+	"errors"
+	"log/slog"
 )
 
-type ChannelServiceImpl struct {
-	pool *pgxpool.Pool
+type ServiceImpl struct {
+	log     *slog.Logger
+	queries *QueriesAdapter
 }
 
-func (s ChannelServiceImpl) Get(ctx context.Context, chann string) (*Channel, error) {
-	conn, err := s.pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Release()
+func NewService(log *slog.Logger, q *QueriesAdapter) *ServiceImpl {
+	return &ServiceImpl{log: log, queries: q}
+}
 
-	q := QueriesAdapter{queries: db.New(conn)}
-	channel, err := q.Select(ctx, chann)
+func (s *ServiceImpl) Get(ctx context.Context, chann string) (*Channel, error) {
+	channel, err := s.queries.Select(ctx, chann)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Channel{
 		Name:            channel.Name,
+		Background:      channel.Background,
 		IsBanned:        channel.IsBanned.Bool,
 		IsPartner:       channel.IsPartner.Bool,
 		FirstLivestream: channel.FirstLivestream.Time,
@@ -34,4 +32,8 @@ func (s ChannelServiceImpl) Get(ctx context.Context, chann string) (*Channel, er
 		Links:           channel.Links,
 		Tags:            channel.Tags,
 	}, nil
+}
+
+func (s *ServiceImpl) Update(ctx context.Context, upd ChannelUpdate) error {
+	return errors.New("not implemented")
 }

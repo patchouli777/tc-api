@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS tc_user(
     first_livestream DATE DEFAULT NULL,
     last_livestream DATE DEFAULT NULL,
     avatar TEXT DEFAULT NULL,
+    offline_background TEXT NOT NULL DEFAULT 'default_offline_background.png',
     description TEXT DEFAULT NULL,
     links TEXT[] DEFAULT NULL,
     tags TEXT[] DEFAULT NULL,

@@ -9,6 +9,7 @@ type Channel struct {
 	FirstLivestream time.Time
 	LastLivestream  time.Time
 	Description     string
+	Background      string
 	Links           []string
 	Tags            []string
 }

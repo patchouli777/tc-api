@@ -17,7 +17,6 @@ func main() {
 	cfg := app.GetConfig()
 	ctx := context.Background()
 
-	// ----------------Постгрес и редис старт----------------
 	rdb := redis.NewClient(cfg.Redis)
 	pool, err := pgxpool.New(ctx, cfg.Postgres.ConnURL)
 	if err != nil {
@@ -29,6 +28,7 @@ func main() {
 
 	srvcs := app.InitServices(ctx, cfg.Log,
 		cfg.InstanceID.String(),
+		cfg.Env,
 		cfg.Update.LivestreamsTimer,
 		&auth.GRPCClientMock{},
 		rdb,
