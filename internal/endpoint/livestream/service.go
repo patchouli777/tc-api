@@ -6,41 +6,48 @@ import (
 	"log/slog"
 )
 
-type LivestreamSearch struct {
-	CategoryId string
-	Category   string
-	Page       int
-	Count      int
+type Getter interface {
+	Get(ctx context.Context, username string) (*Livestream, error)
 }
 
-type Repository interface {
+type Creater interface {
 	Create(ctx context.Context, cr LivestreamCreate) (*Livestream, error)
+}
+
+type Updater interface {
 	Update(ctx context.Context, cur *Livestream, upd LivestreamUpdate) (*Livestream, error)
 	UpdateViewers(ctx context.Context, user string, viewers int32) error
 	UpdateThumbnail(ctx context.Context, user, thumbnail string) error
-	Delete(ctx context.Context, username string) (bool, error)
-	Get(ctx context.Context, username string) (*Livestream, error)
-	List(ctx context.Context, category string, page, count int) ([]Livestream, error)
-	ListAll(ctx context.Context) ([]Livestream, error)
-	ListById(ctx context.Context, categoryId string, page, count int) ([]Livestream, error)
 }
 
-type StreamServerAdapter interface {
-	List(ctx context.Context) (*StreamServerResponse, error)
-	Update(ctx context.Context)
+type Lister interface {
+	List(ctx context.Context, category string, page, count int) ([]Livestream, error)
+	ListAll(ctx context.Context) ([]Livestream, error)
+	ListById(ctx context.Context, category string, page, count int) ([]Livestream, error)
+}
+
+type Deleter interface {
+	Delete(ctx context.Context, username string) (bool, error)
+}
+
+type Repository interface {
+	Getter
+	Creater
+	Updater
+	Lister
+	Deleter
 }
 
 type ServiceImpl struct {
-	log     *slog.Logger
-	repo    Repository
-	adapter StreamServerAdapter
+	log  *slog.Logger
+	repo Repository
 }
 
-func NewService(log *slog.Logger, repo Repository, adapter StreamServerAdapter) *ServiceImpl {
-	return &ServiceImpl{log: log, repo: repo, adapter: adapter}
+func NewService(log *slog.Logger, repo Repository) *ServiceImpl {
+	return &ServiceImpl{log: log, repo: repo}
 }
 
-func (s ServiceImpl) Get(ctx context.Context, username string) (*Livestream, error) {
+func (s *ServiceImpl) Get(ctx context.Context, username string) (*Livestream, error) {
 	ls, err := s.repo.Get(ctx, username)
 	if err != nil {
 		return nil, fmt.Errorf("unable to find livestream: %w", err)
@@ -49,7 +56,7 @@ func (s ServiceImpl) Get(ctx context.Context, username string) (*Livestream, err
 	return ls, nil
 }
 
-func (s ServiceImpl) List(ctx context.Context, search LivestreamSearch) ([]Livestream, error) {
+func (s *ServiceImpl) List(ctx context.Context, search LivestreamSearch) ([]Livestream, error) {
 	if search.Page < 1 {
 		search.Page = 1
 	}
@@ -74,7 +81,7 @@ func (s ServiceImpl) List(ctx context.Context, search LivestreamSearch) ([]Lives
 	return list, nil
 }
 
-func (s ServiceImpl) UpdateViewers(ctx context.Context, user string, viewers int32) error {
+func (s *ServiceImpl) UpdateViewers(ctx context.Context, user string, viewers int32) error {
 	err := s.repo.UpdateViewers(ctx, user, viewers)
 	if err != nil {
 		return err
@@ -83,7 +90,7 @@ func (s ServiceImpl) UpdateViewers(ctx context.Context, user string, viewers int
 	return nil
 }
 
-func (s ServiceImpl) Update(ctx context.Context, user string, upd LivestreamUpdate) (bool, error) {
+func (s *ServiceImpl) Update(ctx context.Context, user string, upd LivestreamUpdate) (bool, error) {
 	current, err := s.repo.Get(ctx, user)
 	if err != nil {
 		return false, fmt.Errorf("unable to find livestream: %v", err)

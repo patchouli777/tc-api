@@ -103,7 +103,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 func (r *RepositoryImpl) Get(ctx context.Context, username string) (*Livestream, error) {
 	lsId, err := r.userMap.Get(ctx, username)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось найти трансляцию пользователя %s: %v", username, err)
+		return nil, fmt.Errorf("unable to find %s's livestream: %w", username, err)
 	}
 
 	ls, err := r.store.Get(ctx, *lsId)
@@ -209,10 +209,6 @@ func (r *RepositoryImpl) Update(ctx context.Context, cur *Livestream, upd Livest
 		cur.Category.Link = *upd.CategoryLink
 	}
 
-	if upd.Viewers != nil {
-		cur.Viewers = *upd.Viewers
-	}
-
 	if upd.Thumbnail != nil {
 		cur.Thumbnail = *upd.Thumbnail
 	}
@@ -259,7 +255,7 @@ func (r *RepositoryImpl) Delete(ctx context.Context, username string) (bool, err
 	}
 
 	if lsId == nil {
-		return false, fmt.Errorf("трансляция уже оффлайн")
+		return false, fmt.Errorf("livestream is already offline")
 	}
 
 	ls, err := r.store.Get(ctx, *lsId)
@@ -267,6 +263,7 @@ func (r *RepositoryImpl) Delete(ctx context.Context, username string) (bool, err
 		return false, err
 	}
 
+	// TODO: pipeline
 	if err = r.userMap.Delete(ctx, username).Err(); err != nil {
 		return false, err
 	}
@@ -304,22 +301,22 @@ func (r *RepositoryImpl) addLivestream(ctx context.Context, ls Livestream) error
 
 	res, err := r.userMap.Add(ctx, ls.User.Name, lsIdStr)
 	if err != nil {
-		return fmt.Errorf("не удалось сохранить данные о трансляции в строку: %v", err)
+		return fmt.Errorf("unable to add livestream to userMap: %v", err)
 	}
 	if res.Err() != nil {
 		return err
 	}
 
 	if err = r.sorted.Add(ctx, ls.Category.Link, ls.Viewers, lsIdStr).Err(); err != nil {
-		return fmt.Errorf("не удалось сохранить id трансляции в сортированное множество: %v", err)
+		return fmt.Errorf("unable to add livestream to sorted set: %v", err)
 	}
 
 	if err = r.store.Add(ctx, ls).Err(); err != nil {
-		return fmt.Errorf("не удалось сохранить данные о трансляции в множество: %v", err)
+		return fmt.Errorf("unable to add livestream to set: %v", err)
 	}
 
 	if err = r.ids.Add(ctx, lsIdStr); err != nil {
-		return fmt.Errorf("не удалось сохранить id Трансляции в множество: %v", err)
+		return fmt.Errorf("unable to add livestream id to set: %v", err)
 	}
 
 	return nil

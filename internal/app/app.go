@@ -72,7 +72,7 @@ func CreateHandler(ctx context.Context, cfg Config, srvcs Services) http.Handler
 type Services struct {
 	Auth       *auth.ServiceImpl
 	Livestream *livestream.ServiceImpl
-	SSAdapter  *livestream.StreamServerAdapterImpl
+	SSAdapter  *livestream.StreamServerAdapter
 	Category   *category.RepositoryImpl
 	Follow     *follow.ServiceImpl
 	User       *user.ServiceImpl
@@ -89,14 +89,17 @@ func InitServices(ctx context.Context,
 	rdb *redis.Client,
 	pool *pgxpool.Pool) Services {
 	livestreamRepo := livestream.NewRepo(rdb, pool)
-	streamServerAdapter := NewStreamServerAdapter(log, env, streamServiceMock, rdb, livestreamRepo, instanceID)
-	livestreamsService := livestream.NewService(log, livestreamRepo, streamServerAdapter)
-	streamServerAdapter.Update(ctx)
+	streamServerAdapter := livestream.NewStreamServerAdapter(log, rdb, livestreamRepo, instanceID)
+	livestreamsService := livestream.NewService(log, livestreamRepo)
+	streamServerAdapter.Update(ctx, lsUpdateTimeout)
 
 	channelDBAdapter := channel.NewAdapter(pool)
 	channelService := channel.NewService(log, channelDBAdapter)
 
 	categoryRepo := category.NewRepo(rdb, pool)
+	categoryUpdater := category.NewUpdater(log, livestreamRepo, categoryRepo)
+	// TODO: change category update timeout
+	categoryUpdater.Update(ctx, lsUpdateTimeout)
 
 	authDBAdapter := auth.NewAdapter(pool)
 	authService := auth.NewService(log, grpcClient, authDBAdapter)
@@ -136,9 +139,4 @@ func NewGRPClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfi
 
 	log.Info("ENV is not prod and AUTH_SERVICE_MOCK is not false. Initializing mock grpc client.")
 	return &auth.GRPCClientMock{}, nil
-}
-
-func NewStreamServerAdapter(log *slog.Logger, env string, isMock bool, rdb *redis.Client,
-	lsr livestream.Repository, instanceId string) *livestream.StreamServerAdapterImpl {
-	return livestream.NewStreamServerAdapter(log, rdb, lsr, instanceId)
 }

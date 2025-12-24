@@ -17,19 +17,24 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type StreamServerAdapterImpl struct {
-	wheel      *timingwheel.TimingWheel
-	InstanceID string
-	lsr        Repository
-	log        *slog.Logger
-	endpoint   string
+type updater interface {
+	Updater
+	Creater
 }
 
-func NewStreamServerAdapter(log *slog.Logger, rdb *redis.Client, lsr Repository,
-	InstanceID string) *StreamServerAdapterImpl {
+type StreamServerAdapter struct {
+	log        *slog.Logger
+	endpoint   string
+	wheel      *timingwheel.TimingWheel
+	InstanceID string
+	lsr        updater
+}
+
+func NewStreamServerAdapter(log *slog.Logger, rdb *redis.Client, lsr updater,
+	InstanceID string) *StreamServerAdapter {
 	wheel := timingwheel.NewTimingWheel(5*time.Second, 16)
 
-	return &StreamServerAdapterImpl{
+	return &StreamServerAdapter{
 		lsr:        lsr,
 		log:        log,
 		wheel:      wheel,
@@ -37,45 +42,51 @@ func NewStreamServerAdapter(log *slog.Logger, rdb *redis.Client, lsr Repository,
 		endpoint:   "http://localhost:1985/api/v1/streams"}
 }
 
-func (u *StreamServerAdapterImpl) List(ctx context.Context) (*StreamServerResponse, error) {
+func (u *StreamServerAdapter) List(ctx context.Context) (*StreamServerResponse, error) {
+	cl := &http.Client{}
+	response, err := cl.Get(u.endpoint)
+	if err != nil {
+		u.log.Error("unable to get livestreams from server", sl.Err(err))
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		u.log.Error("unable to read response from streaming server", sl.Err(err))
+		return nil, err
+	}
+
+	var resp StreamServerResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		u.log.Error("unable to unmarshal response from streaming server", sl.Err(err))
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+func (u *StreamServerAdapter) Get(ctx context.Context) (*StreamServerResponse, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (u *StreamServerAdapterImpl) Get(ctx context.Context) (*StreamServerResponse, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (u *StreamServerAdapterImpl) Update(ctx context.Context) {
+// TODO: adapter must respect context
+func (u *StreamServerAdapter) Update(ctx context.Context, timeout time.Duration) {
 	go func() {
 		for {
-			cl := &http.Client{}
-			response, err := cl.Get(u.endpoint)
+			resp, err := u.List(ctx)
 			if err != nil {
-				fmt.Printf("error getting livestreams from server: %v\n", err)
-				return
-			}
-			defer response.Body.Close()
-
-			body, err := io.ReadAll(response.Body)
-			if err != nil {
-				fmt.Printf("Reading body failed: %v\n", err)
-				return
-			}
-
-			var resp StreamServerResponse
-			if err := json.Unmarshal(body, &resp); err != nil {
-				fmt.Printf("%+v", response.Body)
-				fmt.Printf("error getting livestreams from server: %v\n", err)
+				u.log.Error("Unable to get a response from streaming server. Cancelling updates for livestreams.", sl.Err(err))
 				return
 			}
 
 			entries, err := os.ReadDir("./static/livestreamthumbs")
 			if err != nil {
-				fmt.Printf("error reading ./static/livestreamthumbs: %v\n", err)
+				u.log.Error("Unable to read ./static/livestreamthumbs. Cancelling updates for livestreams.", sl.Err(err))
 				return
 			}
 
-			// TODO: currently all livestream updated every 25s for simplicity
+			// TODO: currently all livestreams updated every 25s for simplicity
 			// implement single-stream updating with timewheel
 			// also currently stream server is not serving livestream thumbs
 			// but it should (apparently) !!
@@ -91,14 +102,13 @@ func (u *StreamServerAdapterImpl) Update(ctx context.Context) {
 				thumbnailId := rand.Intn(len(entries))
 				thumbnail := entries[thumbnailId].Name()
 
-				fmt.Printf("thumbnail: %s\n", thumbnail)
 				// TODO: pipe
 				u.lsr.UpdateViewers(ctx, st.Name, int32(st.Clients))
 				u.lsr.UpdateThumbnail(ctx, st.Name, "livestreamthumbs/"+thumbnail)
 			}
 
-			u.log.Info("Viewers count updated. Next in 25s.")
-			time.Sleep(time.Second * 25)
+			u.log.Info(fmt.Sprintf("Viewers count updated. Next in %s.", timeout.String()))
+			time.Sleep(timeout)
 		}
 	}()
 }

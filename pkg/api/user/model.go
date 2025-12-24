@@ -46,7 +46,7 @@ type DeleteResponse struct {
 	Success bool `json:"success"`
 }
 
-// TODO: курсорная пагинация
+// TODO: cursor pagination??
 type ListRequest struct {
 	Count           int       `json:"count"`
 	Page            int       `json:"page"`

@@ -13,11 +13,9 @@ import (
 )
 
 type Service interface {
-	// Start(ctx context.Context, categoryLink, title, username string) (*Livestream, error)
 	Get(ctx context.Context, username string) (*Livestream, error)
 	Update(ctx context.Context, user string, ls LivestreamUpdate) (bool, error)
 	List(ctx context.Context, s LivestreamSearch) ([]Livestream, error)
-	// Stop(ctx context.Context, username string) (bool, error)
 }
 
 type Handler struct {

@@ -17,7 +17,6 @@ type Livestream struct {
 type LivestreamUpdate struct {
 	Title        *string
 	Thumbnail    *string
-	Viewers      *int32
 	CategoryLink *string
 }
 
@@ -25,6 +24,13 @@ type LivestreamCreate struct {
 	Title        string
 	CategoryLink string
 	Username     string
+}
+
+type LivestreamSearch struct {
+	CategoryId string
+	Category   string
+	Page       int
+	Count      int
 }
 
 type Category struct {

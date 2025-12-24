@@ -18,7 +18,7 @@ import (
 func Populate(ctx context.Context,
 	pool *pgxpool.Pool,
 	as *auth.ServiceImpl,
-	ls *livestream.StreamServerAdapterImpl,
+	ls *livestream.StreamServerAdapter,
 	cr *category.RepositoryImpl,
 	fs *follow.ServiceImpl,
 	us *user.ServiceImpl) {
@@ -62,15 +62,11 @@ func addUsers(ctx context.Context, pool *pgxpool.Pool) {
 	r.Close()
 }
 
-func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *livestream.StreamServerAdapterImpl) {
+func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *livestream.StreamServerAdapter) {
 	cl := livestreamApi.NewStreamServerClient()
 
 	for i := range streamsCount {
-		resp, err := cl.Start(users[i].Name)
-
-		fmt.Printf("%+v\n", resp.Body)
-		fmt.Printf("%+v\n", resp)
-
+		_, err := cl.Start(users[i].Name)
 		if err != nil {
 			log.Fatalf("unable to start livestream: %v", err)
 		}

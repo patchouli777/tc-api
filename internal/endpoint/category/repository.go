@@ -76,7 +76,7 @@ func (r *RepositoryImpl) List(ctx context.Context, f CategoryFilter) ([]Category
 	return categories, nil
 }
 
-// TODO: добавить теги
+// TODO: tags
 func (r *RepositoryImpl) Create(ctx context.Context, cat CategoryCreate) error {
 	conn, err := r.pool.Acquire(ctx)
 	if err != nil {
