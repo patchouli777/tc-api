@@ -4,7 +4,7 @@ type Category struct {
 	Id        int32    `redis:"id"`
 	IsSafe    bool     `redis:"is_safe"`
 	Thumbnail string   `redis:"thumbnail"`
-	Name      string   `redis:"mame"`
+	Name      string   `redis:"name"`
 	Link      string   `redis:"link"`
 	Viewers   int32    `redis:"viewers"`
 	Tags      []string `redis:"-" json:"-"`

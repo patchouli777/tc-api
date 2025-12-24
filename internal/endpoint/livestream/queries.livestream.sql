@@ -172,3 +172,15 @@ WHERE
         WHERE
             name = $1
     );
+
+
+-- name: LivestreamUpdateViewers :exec
+UPDATE tc_livestream
+    SET
+        viewers = $1
+    FROM
+        tc_user
+    WHERE
+        tc_livestream.id_user = tc_user.id
+    AND
+        tc_user.name = $2;

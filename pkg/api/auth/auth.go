@@ -8,7 +8,7 @@ import (
 )
 
 func UserLogin(user User) (*TokenPair, error) {
-	req, err := http.NewRequest(http.MethodPost, API_URL+"/auth/login", nil)
+	req, err := http.NewRequest(http.MethodPost, "localhost:8090/api"+"/auth/login", nil)
 	if err != nil {
 		fmt.Printf("unable to create request: %v\n", err)
 		return nil, err

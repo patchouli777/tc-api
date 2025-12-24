@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,14 +21,16 @@ const (
 )
 
 type Config struct {
-	Postgres   PostgresConfig
-	HTTP       HttpServerConfig
-	GRPC       GrpcClientConfig
-	Update     UpdateConfig
-	Redis      *redis.Options
-	Log        *slog.Logger
-	Env        string
-	InstanceID uuid.UUID
+	Postgres          PostgresConfig
+	HTTP              HttpServerConfig
+	GRPC              GrpcClientConfig
+	Update            UpdateConfig
+	Redis             *redis.Options
+	Log               *slog.Logger
+	Env               string
+	InstanceID        uuid.UUID
+	AuthServiceMock   bool
+	StreamServiceMock bool
 }
 
 func GetConfig() Config {
@@ -46,6 +49,18 @@ func GetConfig() Config {
 	redisPassword := os.Getenv("REDIS_PASSWORD")
 	apiPort := os.Getenv("API_PORT")
 	env := os.Getenv("ENV")
+
+	authServiceMockEnv := os.Getenv("AUTH_SERVICE_MOCK")
+	authServiceMock, err := strconv.ParseBool(authServiceMockEnv)
+	if err != nil {
+		authServiceMock = false
+	}
+
+	streamServiceMockEnv := os.Getenv("STREAM_SERVICE_MOCK")
+	streamServiceMock, err := strconv.ParseBool(streamServiceMockEnv)
+	if err != nil {
+		streamServiceMock = false
+	}
 
 	connURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", dbUser, dbUserPassword, dbHost, dbPort, dbName)
 
@@ -80,8 +95,10 @@ func GetConfig() Config {
 			Timeout: time.Second * 5,
 			Retries: 5,
 		},
-		Env:        env,
-		InstanceID: uuid.New(),
+		Env:               env,
+		InstanceID:        uuid.New(),
+		AuthServiceMock:   authServiceMock,
+		StreamServiceMock: streamServiceMock,
 	}
 }
 

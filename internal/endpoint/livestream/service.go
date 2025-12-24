@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"main/internal/lib/sl"
 )
 
 type LivestreamSearch struct {
@@ -27,8 +26,6 @@ type Repository interface {
 }
 
 type StreamServerAdapter interface {
-	Start(ctx context.Context, username string) error
-	End(ctx context.Context, username string) error
 	List(ctx context.Context) (*StreamServerResponse, error)
 	Update(ctx context.Context)
 }
@@ -41,25 +38,6 @@ type ServiceImpl struct {
 
 func NewService(log *slog.Logger, repo Repository, adapter StreamServerAdapter) *ServiceImpl {
 	return &ServiceImpl{log: log, repo: repo, adapter: adapter}
-}
-
-func (s ServiceImpl) Start(ctx context.Context, categoryLink, title, username string) (*Livestream, error) {
-	err := s.adapter.Start(ctx, username)
-	if err != nil {
-		return nil, fmt.Errorf("unable to start livestream: %w", err)
-	}
-
-	ls, err := s.repo.Create(ctx, LivestreamCreate{
-		Title:        title,
-		CategoryLink: categoryLink,
-		Username:     username,
-	})
-	if err != nil {
-		s.adapter.End(ctx, username)
-		return nil, fmt.Errorf("unable to cache livestream: %w", err)
-	}
-
-	return ls, nil
 }
 
 func (s ServiceImpl) Get(ctx context.Context, username string) (*Livestream, error) {
@@ -114,26 +92,6 @@ func (s ServiceImpl) Update(ctx context.Context, user string, upd LivestreamUpda
 	_, err = s.repo.Update(ctx, current, upd)
 	if err != nil {
 		return false, fmt.Errorf("unable to update livestream: %v", err)
-	}
-
-	return true, nil
-}
-
-// TODO: 200 on multiple stop
-func (s ServiceImpl) Stop(ctx context.Context, u string) (bool, error) {
-	err := s.adapter.End(ctx, u)
-	if err != nil {
-		// return false, err
-		s.log.Error("unable to end livestream", sl.Err(err))
-	}
-
-	res, err := s.repo.Delete(ctx, u)
-	if err != nil {
-		return false, fmt.Errorf("unable to delete livestream from cache: %v", err)
-	}
-
-	if !res {
-		return false, fmt.Errorf("unable to find livestream")
 	}
 
 	return true, nil

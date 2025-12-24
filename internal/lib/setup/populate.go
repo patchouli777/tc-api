@@ -10,7 +10,7 @@ import (
 	"main/internal/endpoint/follow"
 	"main/internal/endpoint/livestream"
 	"main/internal/endpoint/user"
-	"math/rand/v2"
+	livestreamApi "main/pkg/api/livestream"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,7 +18,7 @@ import (
 func Populate(ctx context.Context,
 	pool *pgxpool.Pool,
 	as *auth.ServiceImpl,
-	ls *livestream.ServiceImpl,
+	ls *livestream.StreamServerAdapterImpl,
 	cr *category.RepositoryImpl,
 	fs *follow.ServiceImpl,
 	us *user.ServiceImpl) {
@@ -62,22 +62,14 @@ func addUsers(ctx context.Context, pool *pgxpool.Pool) {
 	r.Close()
 }
 
-func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *livestream.ServiceImpl) {
-	categoriesArray, err := cr.List(ctx, category.CategoryFilter{
-		Page:  1,
-		Count: 9999999999,
-		Sort:  "desc",
-	})
-	if err != nil {
-		log.Fatalf("unable to get list of categories: %v", err)
-	}
+func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *livestream.StreamServerAdapterImpl) {
+	cl := livestreamApi.NewStreamServerClient()
 
 	for i := range streamsCount {
-		categoryId := rand.IntN(len(categoriesArray))
-		category := categoriesArray[categoryId]
+		resp, err := cl.Start(users[i].Name)
 
-		_, err := ls.Start(ctx, category.Link,
-			fmt.Sprintf("стрим юзера %s", users[i].Name), users[i].Name)
+		fmt.Printf("%+v\n", resp.Body)
+		fmt.Printf("%+v\n", resp)
 
 		if err != nil {
 			log.Fatalf("unable to start livestream: %v", err)

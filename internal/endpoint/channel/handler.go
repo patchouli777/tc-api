@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"main/internal/lib/er"
+	c "main/pkg/api/channel"
 	"net/http"
 )
 
@@ -42,7 +43,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(GetResponse{
+	json.NewEncoder(w).Encode(c.GetResponse{
 		IsBanned:        chann.IsBanned,
 		IsPartner:       chann.IsPartner,
 		Background:      chann.Background,

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"main/internal/lib/sl"
 	"math/rand"
 	"net/http"
 	"os"
@@ -20,6 +22,7 @@ type StreamServerAdapterImpl struct {
 	InstanceID string
 	lsr        Repository
 	log        *slog.Logger
+	endpoint   string
 }
 
 func NewStreamServerAdapter(log *slog.Logger, rdb *redis.Client, lsr Repository,
@@ -27,38 +30,41 @@ func NewStreamServerAdapter(log *slog.Logger, rdb *redis.Client, lsr Repository,
 	wheel := timingwheel.NewTimingWheel(5*time.Second, 16)
 
 	return &StreamServerAdapterImpl{
+		lsr:        lsr,
+		log:        log,
 		wheel:      wheel,
-		InstanceID: InstanceID}
-}
-
-func (u *StreamServerAdapterImpl) Start(ctx context.Context, username string) error {
-	return errors.New("not implemented")
-}
-
-func (u *StreamServerAdapterImpl) End(ctx context.Context, username string) error {
-	return errors.New("not implemented")
+		InstanceID: InstanceID,
+		endpoint:   "http://localhost:1985/api/v1/streams"}
 }
 
 func (u *StreamServerAdapterImpl) List(ctx context.Context) (*StreamServerResponse, error) {
 	return nil, errors.New("not implemented")
 }
 
+func (u *StreamServerAdapterImpl) Get(ctx context.Context) (*StreamServerResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (u *StreamServerAdapterImpl) Update(ctx context.Context) {
 	go func() {
 		for {
-			endpoint := "http://localhost:1985/api/v1/streams/"
-
 			cl := &http.Client{}
-			response, err := cl.Get(endpoint)
+			response, err := cl.Get(u.endpoint)
 			if err != nil {
 				fmt.Printf("error getting livestreams from server: %v\n", err)
 				return
 			}
 			defer response.Body.Close()
 
-			var resp StreamServerResponse
-			err = json.NewDecoder(response.Body).Decode(&resp)
+			body, err := io.ReadAll(response.Body)
 			if err != nil {
+				fmt.Printf("Reading body failed: %v\n", err)
+				return
+			}
+
+			var resp StreamServerResponse
+			if err := json.Unmarshal(body, &resp); err != nil {
+				fmt.Printf("%+v", response.Body)
 				fmt.Printf("error getting livestreams from server: %v\n", err)
 				return
 			}
@@ -69,54 +75,33 @@ func (u *StreamServerAdapterImpl) Update(ctx context.Context) {
 				return
 			}
 
+			// TODO: currently all livestream updated every 25s for simplicity
+			// implement single-stream updating with timewheel
+			// also currently stream server is not serving livestream thumbs
+			// but it should (apparently) !!
 			for _, st := range resp.Streams {
+				_, err := u.lsr.Create(ctx, LivestreamCreate{CategoryLink: "apex",
+					Title:    fmt.Sprintf("livestream of %s", st.Name),
+					Username: st.Name,
+				})
+				if err != nil {
+					u.log.Error("error", sl.Err(err), slog.String("user", st.Name))
+				}
+
 				thumbnailId := rand.Intn(len(entries))
 				thumbnail := entries[thumbnailId].Name()
+
 				fmt.Printf("thumbnail: %s\n", thumbnail)
 				// TODO: pipe
 				u.lsr.UpdateViewers(ctx, st.Name, int32(st.Clients))
-				u.lsr.UpdateThumbnail(ctx, st.Name, thumbnail)
+				u.lsr.UpdateThumbnail(ctx, st.Name, "livestreamthumbs/"+thumbnail)
 			}
 
+			u.log.Info("Viewers count updated. Next in 25s.")
 			time.Sleep(time.Second * 25)
 		}
 	}()
 }
-
-// func (u *StreamServerAdapterImpl) Subscribe(ctx context.Context) {
-// 	pubsub := u.rdb.Subscribe(ctx, "updatable-channel")
-
-// 	_, err := pubsub.Receive(ctx)
-// 	if err != nil {
-// 		slog.Error("receiving", sl.Err(err))
-// 	}
-
-// 	ch := pubsub.Channel()
-// 	go func() {
-// 		for msg := range ch {
-// 			fmt.Printf("Received message from channel %s: %s\n", msg.Channel, msg.Payload)
-// 		}
-// 	}()
-// }
-
-// func (u *StreamServerAdapterImpl) Subscribe(ctx context.Context, eventCh <-chan EventLivestream) {
-// 	u.wheel.Start()
-
-// 	go func() {
-// 		for {
-// 			select {
-// 			case e := <-eventCh:
-// 				u.wheel.AfterFunc(2*time.Second, func() {
-// 					fmt.Println("hi from timeheel")
-// 				})
-// 				fmt.Printf("event: type: %s, channel: %s\n", e.Type, e.Channel)
-// 			case <-ctx.Done():
-// 				fmt.Println("ctx done")
-// 				return
-// 			}
-// 		}
-// 	}()
-// }
 
 type StreamServerResponse struct {
 	Code    int    `json:"code"`

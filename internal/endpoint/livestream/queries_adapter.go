@@ -50,3 +50,7 @@ func (q *QueriesAdapter) Insert(ctx context.Context, arg db.LivestreamInsertPara
 func (q *QueriesAdapter) Update(ctx context.Context, arg db.LivestreamUpdateParams) (db.LivestreamUpdateRow, error) {
 	return q.queries.LivestreamUpdate(ctx, arg)
 }
+
+func (q *QueriesAdapter) UpdateViewers(ctx context.Context, arg db.LivestreamUpdateViewersParams) error {
+	return q.queries.LivestreamUpdateViewers(ctx, arg)
+}

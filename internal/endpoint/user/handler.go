@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/er"
+	u "main/pkg/api/user"
 	"net/http"
 )
 
@@ -52,13 +53,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		json.NewEncoder(w).Encode(GetResponseNotFound{
+		json.NewEncoder(w).Encode(u.GetResponseNotFound{
 			Result: "specified user not found",
 		})
 		return
 	}
 
-	json.NewEncoder(w).Encode(GetResponse{
+	json.NewEncoder(w).Encode(u.GetResponse{
 		Id:              user.Id,
 		Name:            user.Name,
 		IsBanned:        user.IsBanned,
@@ -84,7 +85,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	const op = "creating user"
 
-	var req PostRequest
+	var req u.PostRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		er.HandlerError(h.log, w, err, op, "invalid data in the request")
@@ -168,7 +169,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req PatchRequest
+	var req u.PatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		er.HandlerError(h.log, w, err, op, "invalid data in the request")
@@ -236,7 +237,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req DeleteRequest
+	var req u.DeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		er.HandlerError(h.log, w, err, op, "invalid data in the request")
@@ -283,7 +284,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req ListRequest
+	var req u.ListRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		er.HandlerError(h.log, w, err, op, "invalid data in the request")
@@ -297,22 +298,22 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	usersResponse := make([]ListResponseItem, len(users))
+	usersResponse := make([]u.ListResponseItem, len(users))
 
-	for i, u := range users {
-		usersResponse[i] = ListResponseItem{
-			Id:              u.Id,
-			Name:            u.Name,
-			IsBanned:        u.IsBanned,
-			IsPartner:       u.IsPartner,
-			FirstLivestream: u.FirstLivestream,
-			LastLivestream:  u.LastLivestream,
-			Avatar:          u.Avatar,
-			Description:     u.Description,
+	for i, user := range users {
+		usersResponse[i] = u.ListResponseItem{
+			Id:              user.Id,
+			Name:            user.Name,
+			IsBanned:        user.IsBanned,
+			IsPartner:       user.IsPartner,
+			FirstLivestream: user.FirstLivestream,
+			LastLivestream:  user.LastLivestream,
+			Avatar:          user.Avatar,
+			Description:     user.Description,
 		}
 	}
 
-	listResponse := ListResponse{
+	listResponse := u.ListResponse{
 		Users: usersResponse,
 	}
 

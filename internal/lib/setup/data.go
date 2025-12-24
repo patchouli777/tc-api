@@ -130,7 +130,7 @@ func usersGet(count int) []setupUser {
 	return users
 }
 
-const streamsCountRatio = 1 / float64(1)
+const streamsCountRatio = 0.25 / float64(1)
 const usersCount = 100
 const categoriesCount = 5
 const followCountRatio = 1 / float64(2)

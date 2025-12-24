@@ -8,6 +8,7 @@ import (
 	"main/internal/auth"
 	"main/internal/lib/er"
 	"main/internal/lib/sl"
+	c "main/pkg/api/category"
 	"net/http"
 	"strconv"
 )
@@ -98,7 +99,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		category = res
 	}
 
-	json.NewEncoder(w).Encode(GetResponse{Category: Category{
+	json.NewEncoder(w).Encode(c.GetResponse{Category: c.Category{
 		Id:        category.Id,
 		IsSafe:    category.IsSafe,
 		Thumbnail: category.Thumbnail,
@@ -173,9 +174,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	categoriesList := make([]ListResponseItem, len(categories))
+	categoriesList := make([]c.ListResponseItem, len(categories))
 	for i, cat := range categories {
-		categoriesList[i] = ListResponseItem{
+		categoriesList[i] = c.ListResponseItem{
 			Name:      cat.Name,
 			Thumbnail: cat.Thumbnail,
 			Link:      cat.Link,
@@ -185,7 +186,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	json.NewEncoder(w).Encode(ListResponse{Categories: categoriesList})
+	json.NewEncoder(w).Encode(c.ListResponse{Categories: categoriesList})
 }
 
 // Post creates a new category
@@ -219,7 +220,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req PostRequest
+	var req c.PostRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -275,7 +276,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request PatchRequest
+	var request c.PatchRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)

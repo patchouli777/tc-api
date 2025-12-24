@@ -8,14 +8,13 @@ import (
 	"net/http"
 )
 
-type CustomClient struct {
-	Log     *slog.Logger
-	Client  *http.Client
-	BaseURL string
+type BaseClient struct {
+	Log    *slog.Logger
+	Client *http.Client
 }
 
-func (c *CustomClient) Get(url string) (*http.Request, error) {
-	const op = "lib.client.CustomClient.Get"
+func (c *BaseClient) Get(url string) (*http.Request, error) {
+	const op = "lib.client.BaseClient.Get"
 
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer([]byte{}))
 	if err != nil {
@@ -26,8 +25,8 @@ func (c *CustomClient) Get(url string) (*http.Request, error) {
 	return req, nil
 }
 
-func (c *CustomClient) Post(url string, data any) (*http.Request, error) {
-	const op = "lib.client.CustomClient.Post"
+func (c *BaseClient) Post(url string, data any) (*http.Request, error) {
+	const op = "lib.client.BaseClient.Post"
 
 	bs, err := json.Marshal(data)
 	if err != nil {
@@ -46,8 +45,8 @@ func (c *CustomClient) Post(url string, data any) (*http.Request, error) {
 	return req, err
 }
 
-func (c *CustomClient) Patch(url string, data any) (*http.Request, error) {
-	const op = "lib.client.CustomClient.Patch"
+func (c *BaseClient) Patch(url string, data any) (*http.Request, error) {
+	const op = "lib.client.BaseClient.Patch"
 
 	bs, err := json.Marshal(data)
 	if err != nil {
@@ -66,8 +65,8 @@ func (c *CustomClient) Patch(url string, data any) (*http.Request, error) {
 	return req, err
 }
 
-func (c *CustomClient) Delete(url string, data any) (*http.Request, error) {
-	const op = "lib.client.CustomClient.Delete"
+func (c *BaseClient) Delete(url string, data any) (*http.Request, error) {
+	const op = "lib.client.BaseClient.Delete"
 
 	bs, err := json.Marshal(data)
 	if err != nil {

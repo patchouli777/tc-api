@@ -12,8 +12,16 @@ type QueriesAdapter struct {
 	queries *db.Queries
 }
 
+func NewDBAdapter(queries *db.Queries) *QueriesAdapter {
+	return &QueriesAdapter{queries: queries}
+}
+
 func (q *QueriesAdapter) SelectById(ctx context.Context, id int32) (db.UserSelectByIdRow, error) {
 	return q.queries.UserSelectById(ctx, id)
+}
+
+func (q *QueriesAdapter) SelectByUsername(ctx context.Context, username string) (db.UserSelectByUsernameRow, error) {
+	return q.queries.UserSelectByUsername(ctx, username)
 }
 
 func (q *QueriesAdapter) Insert(ctx context.Context, p db.UserInsertParams) (int32, error) {

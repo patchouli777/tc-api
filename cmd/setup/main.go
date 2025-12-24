@@ -29,6 +29,7 @@ func main() {
 	srvcs := app.InitServices(ctx, cfg.Log,
 		cfg.InstanceID.String(),
 		cfg.Env,
+		cfg.StreamServiceMock,
 		cfg.Update.LivestreamsTimer,
 		&auth.GRPCClientMock{},
 		rdb,
@@ -36,7 +37,7 @@ func main() {
 
 	setup.Populate(ctx, pool,
 		srvcs.Auth,
-		srvcs.Livestream,
+		srvcs.SSAdapter,
 		srvcs.Category,
 		srvcs.Follow,
 		srvcs.User)

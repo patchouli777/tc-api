@@ -15,7 +15,6 @@ require (
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.6
 	golang.org/x/net v0.46.0
-	golang.org/x/time v0.14.0
 	google.golang.org/grpc v1.76.0
 )
 

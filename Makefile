@@ -34,6 +34,8 @@ local:
 	-p 6379:6379 \
 	--rm redis:latest
 
+	go run ./cmd/streamservermock
+
 
 local-stop:
 	docker stop twc-backend-postgres

@@ -7,16 +7,17 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/er"
+	l "main/pkg/api/livestream"
 	"net/http"
 	"strconv"
 )
 
 type Service interface {
-	Start(ctx context.Context, categoryLink, title, username string) (*Livestream, error)
+	// Start(ctx context.Context, categoryLink, title, username string) (*Livestream, error)
 	Get(ctx context.Context, username string) (*Livestream, error)
 	Update(ctx context.Context, user string, ls LivestreamUpdate) (bool, error)
 	List(ctx context.Context, s LivestreamSearch) ([]Livestream, error)
-	Stop(ctx context.Context, username string) (bool, error)
+	// Stop(ctx context.Context, username string) (bool, error)
 }
 
 type Handler struct {
@@ -50,13 +51,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := GetResponse{
+	response := l.GetResponse{
 		Id:        int(ls.Id),
 		Username:  ls.User.Name,
 		Avatar:    ls.User.Avatar,
 		StartedAt: int(ls.StartedAt),
 		Viewers:   ls.Viewers,
-		Category: LivestreamCategory{
+		Category: l.LivestreamCategory{
 			Link: ls.Category.Link,
 			Name: ls.Category.Name,
 		},
@@ -135,15 +136,15 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	listResponse := ListResponse{
-		Livestreams: make([]ListResponseItem, len(livestreams)),
+	listResponse := l.ListResponse{
+		Livestreams: make([]l.ListResponseItem, len(livestreams)),
 	}
 
 	for i, ls := range livestreams {
-		listResponse.Livestreams[i] = ListResponseItem{
+		listResponse.Livestreams[i] = l.ListResponseItem{
 			Username: ls.User.Name,
 			Avatar:   ls.User.Avatar,
-			Category: LivestreamCategory{
+			Category: l.LivestreamCategory{
 				Name: ls.Category.Name,
 				Link: ls.Category.Link,
 			},
@@ -157,67 +158,6 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(listResponse)
-}
-
-// StartLivestream godoc
-// @Summary      Start a new livestream for a user
-// @Description  Starts a livestream if the authenticated user matches the username in the path
-// @Tags         livestream
-// @Accept       json
-// @Produce      json
-// @Param        username  path      string       true  "Username"
-// @Param        data      body      PostRequest  true  "Livestream start data"
-// @Success      200       {object}  PostResponse
-// @Failure      400       {object}  er.RequestError
-// @Failure      500       {object}  er.RequestError
-// @Security     ApiKeyAuth
-// @Router       /livestreams/{username} [post]
-func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
-	const op = "starting livestream"
-
-	username := r.PathValue("username")
-	ctx := r.Context()
-	claims := ctx.Value(auth.AuthContextKey{})
-	cl := claims.(*auth.Claims)
-
-	if cl.Username != username {
-		const msg = "identity is not confirmed"
-		w.WriteHeader(http.StatusUnauthorized)
-		er.HandlerError(h.log, w, fmt.Errorf("%s", msg), op, msg)
-		return
-	}
-
-	var data PostRequest
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
-		return
-	}
-
-	if data.CategoryLink == "" || data.Title == "" || username == "" {
-		const msg = "invalid category link, title or username"
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("%s", msg), op, msg)
-		return
-	}
-
-	ls, err := h.s.Start(r.Context(), data.CategoryLink, data.Title, username)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
-		return
-	}
-
-	resp := PostResponse{
-		Username:  ls.User.Name,
-		Category:  ls.Category.Name,
-		Title:     ls.Title,
-		StartedAt: ls.StartedAt,
-		Viewers:   ls.Viewers,
-	}
-
-	json.NewEncoder(w).Encode(resp)
 }
 
 // UpdateLivestream godoc
@@ -261,7 +201,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request PatchRequest
+	var request l.PatchRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -280,48 +220,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := PatchResponse{
-		Status: status,
-	}
-
-	json.NewEncoder(w).Encode(resp)
-}
-
-// StopLivestream godoc
-// @Summary      Stop a livestream for a user
-// @Description  Stops the livestream if the authenticated user matches the username in the path
-// @Tags         livestream
-// @Accept       json
-// @Produce      json
-// @Param        username  path      string  true  "Username"
-// @Success      200       {object}  DeleteResponse
-// @Failure      400       {object}  er.RequestError
-// @Failure      500       {object}  er.RequestError
-// @Security     ApiKeyAuth
-// @Router       /livestreams/{username} [delete]
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	const op = "stopping livestream"
-
-	username := r.PathValue("username")
-	ctx := r.Context()
-	user := ctx.Value(auth.AuthContextKey{})
-	usr := user.(*auth.Claims)
-
-	if usr.Username != username {
-		const msg = "identity is not confirmed"
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("%s", msg), op, msg)
-		return
-	}
-
-	status, err := h.s.Stop(r.Context(), username)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
-		return
-	}
-
-	resp := DeleteResponse{
+	resp := l.PatchResponse{
 		Status: status,
 	}
 

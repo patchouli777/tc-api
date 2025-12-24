@@ -1,5 +1,14 @@
 package category
 
+type Category struct {
+	Id        int32    `json:"id"`
+	IsSafe    bool     `json:"is_safe"`
+	Thumbnail string   `json:"thumbnail"`
+	Name      string   `json:"name"`
+	Link      string   `json:"link"`
+	Viewers   int32    `json:"viewers"`
+	Tags      []string `json:"-"`
+}
 type GetRequest struct {
 	CategoryLink string `json:"link"`
 }

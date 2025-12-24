@@ -28,7 +28,7 @@ func New(ctx context.Context, cfg Config) *http.Server {
 		return nil
 	}
 
-	grpcClient, err := NewGRPClient(cfg.Log, cfg.Env, cfg.GRPC)
+	grpcClient, err := NewGRPClient(cfg.Log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
 	if err != nil {
 		cfg.Log.Error("unable to initialize grpc client", sl.Err(err))
 		return nil
@@ -38,6 +38,7 @@ func New(ctx context.Context, cfg Config) *http.Server {
 		cfg.Log,
 		cfg.InstanceID.String(),
 		cfg.Env,
+		cfg.StreamServiceMock,
 		cfg.Update.LivestreamsTimer,
 		grpcClient,
 		rdb,
@@ -55,10 +56,7 @@ func New(ctx context.Context, cfg Config) *http.Server {
 	return server
 }
 
-func CreateHandler(ctx context.Context,
-	cfg Config,
-	srvcs Services) http.Handler {
-
+func CreateHandler(ctx context.Context, cfg Config, srvcs Services) http.Handler {
 	mux := http.NewServeMux()
 	addRoutes(mux, cfg.Log,
 		srvcs.Category,
@@ -68,14 +66,13 @@ func CreateHandler(ctx context.Context,
 		srvcs.Follow,
 		srvcs.User)
 
-	// go update.UpdateCategories(updateCtx, log, upd.CategoriesTimer, cs, lsr)
-
 	return mw.PanicRecovery(mw.JSONResponse(mw.CORS(mw.Logging(mux))))
 }
 
 type Services struct {
 	Auth       *auth.ServiceImpl
 	Livestream *livestream.ServiceImpl
+	SSAdapter  *livestream.StreamServerAdapterImpl
 	Category   *category.RepositoryImpl
 	Follow     *follow.ServiceImpl
 	User       *user.ServiceImpl
@@ -86,13 +83,13 @@ func InitServices(ctx context.Context,
 	log *slog.Logger,
 	instanceID string,
 	env string,
+	streamServiceMock bool,
 	lsUpdateTimeout time.Duration,
 	grpcClient auth.GRPCCLient,
 	rdb *redis.Client,
 	pool *pgxpool.Pool) Services {
 	livestreamRepo := livestream.NewRepo(rdb, pool)
-	streamServerAdapter := NewStreamServerAdapter(log, env, rdb, livestreamRepo, instanceID)
-	// livestreamUpdater := livestream.NewUpdater(log)
+	streamServerAdapter := NewStreamServerAdapter(log, env, streamServiceMock, rdb, livestreamRepo, instanceID)
 	livestreamsService := livestream.NewService(log, livestreamRepo, streamServerAdapter)
 	streamServerAdapter.Update(ctx)
 
@@ -115,38 +112,33 @@ func InitServices(ctx context.Context,
 		Channel:    channelService,
 		Category:   categoryRepo,
 		Follow:     followService,
-		User:       userService}
+		User:       userService,
+		SSAdapter:  streamServerAdapter}
 }
 
-func NewGRPClient(log *slog.Logger, env string, cfg GrpcClientConfig) (auth.GRPCCLient, error) {
-	switch env {
-	case envLocal:
-		log.Info("skipped initialization of grpc client because env is local or dev")
-		return &auth.GRPCClientMock{}, nil
-	case envProd:
+func NewGRPClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfig) (auth.GRPCCLient, error) {
+	if env == envProd {
 		return auth.NewGRPClient(log,
 			cfg.Host,
 			cfg.Port,
 			cfg.Timeout,
 			cfg.Retries)
-	default:
-		log.Error(`failed to initialize grpc client due
-	to unknown value of "env" variable. Accepted values are: "prod", "dev", "local". Defaulting to mock. (big danger)`)
-		return &auth.GRPCClientMock{}, nil
 	}
+
+	if !isMock {
+		log.Info("Initializating real grpc client because AUTH_SERVICE_MOCK == false")
+		return auth.NewGRPClient(log,
+			cfg.Host,
+			cfg.Port,
+			cfg.Timeout,
+			cfg.Retries)
+	}
+
+	log.Info("ENV is not prod and AUTH_SERVICE_MOCK is not false. Initializing mock grpc client.")
+	return &auth.GRPCClientMock{}, nil
 }
 
-func NewStreamServerAdapter(log *slog.Logger, env string, rdb *redis.Client,
-	lsr livestream.Repository, instanceId string) livestream.StreamServerAdapter {
-	switch env {
-	case envLocal:
-		log.Info("skipped initialization of stream server adapter because env is local or dev")
-		return livestream.NewStreamServerAdapterMock(log, rdb, lsr, instanceId)
-	case envProd:
-		return livestream.NewStreamServerAdapter(log, rdb, lsr, instanceId)
-	default:
-		log.Error(`failed to initialize stream server adapter due
-	to unknown value of "env" variable. Accepted values are: "prod", "dev", "local". Defaulting to mock. (big danger)`)
-		return livestream.NewStreamServerAdapterMock(log, rdb, lsr, instanceId)
-	}
+func NewStreamServerAdapter(log *slog.Logger, env string, isMock bool, rdb *redis.Client,
+	lsr livestream.Repository, instanceId string) *livestream.StreamServerAdapterImpl {
+	return livestream.NewStreamServerAdapter(log, rdb, lsr, instanceId)
 }

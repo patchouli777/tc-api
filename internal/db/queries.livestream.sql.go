@@ -43,7 +43,7 @@ WITH inserted AS (
         FALSE,
         $3
     )
-    RETURNING id, id_user, id_category, started_at, viewers, is_live, is_multistream, title
+    RETURNING id, id_user, id_category, is_live, viewers, title, started_at, ended_at, is_multistream
 )
 SELECT
     inserted.id AS livestream_id,
@@ -391,7 +391,7 @@ WITH updated AS (
         id_category = (SELECT id FROM tc_category c WHERE c.link = $3)
     WHERE
         id_user = (SELECT id FROM tc_user u WHERE u.name = $4)
-        RETURNING id, id_user, id_category, started_at, viewers, is_live, is_multistream, title
+        RETURNING id, id_user, id_category, is_live, viewers, title, started_at, ended_at, is_multistream
     )
 SELECT
     u.avatar as user_avatar,
@@ -408,7 +408,7 @@ JOIN
 
 type LivestreamUpdateParams struct {
 	Title   pgtype.Text
-	Viewers pgtype.Int4
+	Viewers int32
 	Link    string
 	Name    string
 }
@@ -435,4 +435,26 @@ func (q *Queries) LivestreamUpdate(ctx context.Context, arg LivestreamUpdatePara
 		&i.CategoryName,
 	)
 	return i, err
+}
+
+const livestreamUpdateViewers = `-- name: LivestreamUpdateViewers :exec
+UPDATE tc_livestream
+    SET
+        viewers = $1
+    FROM
+        tc_user
+    WHERE
+        tc_livestream.id_user = tc_user.id
+    AND
+        tc_user.name = $2
+`
+
+type LivestreamUpdateViewersParams struct {
+	Viewers int32
+	Name    string
+}
+
+func (q *Queries) LivestreamUpdateViewers(ctx context.Context, arg LivestreamUpdateViewersParams) error {
+	_, err := q.db.Exec(ctx, livestreamUpdateViewers, arg.Viewers, arg.Name)
+	return err
 }

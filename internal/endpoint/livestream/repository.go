@@ -53,7 +53,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 
 	// TODO: sentinel error
 	if id != nil {
-		return nil, fmt.Errorf("трансляция пользователя %s уже начата: %+v", cr.Username, id)
+		return nil, fmt.Errorf("livestream already started")
 	}
 
 	if err != nil && err != redis.Nil {
@@ -173,6 +173,25 @@ func (r *RepositoryImpl) UpdateViewers(ctx context.Context, user string, viewers
 		return err
 	}
 
+	// NOTE: viewers count is not that important in postgres since it is used only in follow list
+	// so we can fire an update query and forget about it (handle errors though)
+	go func() {
+		conn, err := r.pool.Acquire(ctx)
+		if err != nil {
+			// TODO: handle error
+		}
+		defer conn.Release()
+
+		q := QueriesAdapter{queries: db.New(conn)}
+		err = q.UpdateViewers(ctx, db.LivestreamUpdateViewersParams{
+			Viewers: viewers,
+			Name:    user,
+		})
+		if err != nil {
+			// TODO: handle error
+		}
+	}()
+
 	return r.store.UpdateViewers(ctx, *id, int(viewers))
 }
 
@@ -211,7 +230,7 @@ func (r *RepositoryImpl) Update(ctx context.Context, cur *Livestream, upd Livest
 	q := QueriesAdapter{queries: db.New(conn)}
 	updated, err := q.Update(ctx, db.LivestreamUpdateParams{
 		Title:   pgtype.Text{String: cur.Title, Valid: true},
-		Viewers: pgtype.Int4{Int32: cur.Viewers, Valid: true},
+		Viewers: cur.Viewers,
 		Link:    cur.Category.Link,
 		Name:    cur.User.Name,
 	})

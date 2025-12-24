@@ -21,7 +21,7 @@ func (r *sortedIDStore) Delete(ctx context.Context, categoryLink string) *redis.
 }
 
 func (r *sortedIDStore) Get(ctx context.Context, category string, page, count int) ([]string, error) {
-	ids, err := r.rdb.ZRangeByScore(ctx, r.Key(category), &redis.ZRangeBy{
+	ids, err := r.rdb.ZRevRangeByScore(ctx, r.Key(category), &redis.ZRangeBy{
 		Offset: int64((page - 1) * count),
 		Count:  int64(count),
 		Min:    "0",

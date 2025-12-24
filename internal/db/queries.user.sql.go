@@ -89,6 +89,46 @@ func (q *Queries) UserSelectById(ctx context.Context, id int32) (UserSelectByIdR
 	return i, err
 }
 
+const userSelectByUsername = `-- name: UserSelectByUsername :one
+SELECT
+    id,
+    name,
+    avatar,
+    is_banned,
+    is_partner,
+    first_livestream,
+    last_livestream
+FROM
+    tc_user
+WHERE
+    name = $1
+`
+
+type UserSelectByUsernameRow struct {
+	ID              int32
+	Name            string
+	Avatar          pgtype.Text
+	IsBanned        pgtype.Bool
+	IsPartner       pgtype.Bool
+	FirstLivestream pgtype.Date
+	LastLivestream  pgtype.Date
+}
+
+func (q *Queries) UserSelectByUsername(ctx context.Context, name string) (UserSelectByUsernameRow, error) {
+	row := q.db.QueryRow(ctx, userSelectByUsername, name)
+	var i UserSelectByUsernameRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Avatar,
+		&i.IsBanned,
+		&i.IsPartner,
+		&i.FirstLivestream,
+		&i.LastLivestream,
+	)
+	return i, err
+}
+
 const userUpdateById = `-- name: UserUpdateById :exec
 UPDATE
     tc_user

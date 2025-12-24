@@ -91,7 +91,7 @@ func (s ServiceImpl) ListExtended(ctx context.Context, follower string) ([]Follo
 	following := make([]FollowingListExtendedItem, len(list))
 	for i, f := range list {
 		following[i] = FollowingListExtendedItem{
-			Name:     f.Username,
+			Name:     f.Following.String,
 			Avatar:   f.Avatar.String,
 			Viewers:  f.Viewers.Int32,
 			Title:    f.Title.String,

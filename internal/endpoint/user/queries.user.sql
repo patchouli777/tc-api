@@ -13,6 +13,21 @@ WHERE
     id = $1;
 
 
+-- name: UserSelectByUsername :one
+SELECT
+    id,
+    name,
+    avatar,
+    is_banned,
+    is_partner,
+    first_livestream,
+    last_livestream
+FROM
+    tc_user
+WHERE
+    name = $1;
+
+
 -- name: UserInsert :one
 INSERT INTO tc_user (
     name,

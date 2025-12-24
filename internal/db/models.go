@@ -116,11 +116,12 @@ type TcLivestream struct {
 	ID            int32
 	IDUser        int32
 	IDCategory    int32
-	StartedAt     pgtype.Int4
-	Viewers       pgtype.Int4
-	IsLive        pgtype.Bool
-	IsMultistream bool
+	IsLive        bool
+	Viewers       int32
 	Title         pgtype.Text
+	StartedAt     pgtype.Int4
+	EndedAt       pgtype.Int4
+	IsMultistream bool
 }
 
 type TcSubscriptionTier struct {
@@ -144,6 +145,7 @@ type TcUser struct {
 	IsPartner         pgtype.Bool
 	FirstLivestream   pgtype.Date
 	LastLivestream    pgtype.Date
+	StreamToken       pgtype.Text
 	Avatar            pgtype.Text
 	OfflineBackground string
 	Description       pgtype.Text

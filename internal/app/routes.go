@@ -45,8 +45,6 @@ func addRoutes(mux *http.ServeMux,
 	apiMux.HandleFunc("GET /livestreams", livestreamsHandler.List)
 	apiMux.HandleFunc("GET /livestreams/{username}", livestreamsHandler.Get)
 	apiMux.HandleFunc("PATCH /livestreams/{username}", authMiddleware(log, livestreamsHandler.Patch))
-	apiMux.HandleFunc("POST /livestreams/{username}", authMiddleware(log, livestreamsHandler.Post))
-	apiMux.HandleFunc("DELETE /livestreams/{username}", authMiddleware(log, livestreamsHandler.Delete))
 
 	// {categoryIdentifier} is either int id or category link (e.g. "path-of-exile")
 	categoriesHandler := category.NewHandler(log, cs)

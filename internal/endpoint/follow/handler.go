@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/er"
+	f "main/pkg/api/follow"
 	"net/http"
 )
 
@@ -66,7 +67,7 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(GetResponse{IsFollower: isFollower})
+	json.NewEncoder(w).Encode(f.GetResponse{IsFollower: isFollower})
 }
 
 // List godoc
@@ -104,12 +105,12 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		following := make([]ListExtendedResponseItem, len(extendedList))
+		following := make([]f.ListExtendedResponseItem, len(extendedList))
 		for i, item := range extendedList {
-			following[i] = ListExtendedResponseItem(item)
+			following[i] = f.ListExtendedResponseItem(item)
 		}
 
-		json.NewEncoder(w).Encode(ListExtendedResponse{FollowList: following})
+		json.NewEncoder(w).Encode(f.ListExtendedResponse{FollowList: following})
 		return
 	}
 
@@ -120,12 +121,12 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	following := make([]ListResponseItem, len(followList))
+	following := make([]f.ListResponseItem, len(followList))
 	for i, item := range followList {
-		following[i] = ListResponseItem(item)
+		following[i] = f.ListResponseItem(item)
 	}
 
-	json.NewEncoder(w).Encode(ListResponse{FollowList: following})
+	json.NewEncoder(w).Encode(f.ListResponse{FollowList: following})
 }
 
 // Post godoc
