@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,14 +16,18 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	conf := app.GetConfig()
-	log := conf.Log
+	cfg := app.GetConfig()
 
-	server := app.New(ctx, conf)
+	log := app.NewLogger(cfg.Logger)
+	log.With(slog.String("env", cfg.Env))
+	slog.SetDefault(log)
+
+	server := app.New(ctx, log, cfg)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("server error", sl.Err(err))
+			stop()
 		}
 	}()
 

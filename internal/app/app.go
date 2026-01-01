@@ -13,38 +13,56 @@ import (
 	"main/internal/lib/mw"
 	"main/internal/lib/sl"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 )
 
-func New(ctx context.Context, cfg Config) *http.Server {
-	rdb := redis.NewClient(cfg.Redis)
+func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
+	rdb := redis.NewClient(&redis.Options{
+		// https://github.com/redis/go-redis/issues/3536
+		MaintNotificationsConfig: &maintnotifications.Config{
+			Mode: maintnotifications.ModeDisabled,
+		},
+		Addr:     fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
+		Password: cfg.Redis.Password,
+		DB:       0,
+	})
 
-	pool, err := pgxpool.New(ctx, cfg.Postgres.ConnURL)
+	postgresConnURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
+		cfg.Postgres.User,
+		cfg.Postgres.Password,
+		cfg.Postgres.Host,
+		cfg.Postgres.Port,
+		cfg.Postgres.Name)
+
+	pool, err := pgxpool.New(ctx, postgresConnURL)
 	if err != nil {
-		cfg.Log.Error("unable to create connection pool", sl.Err(err))
+		log.Error("unable to create connection pool", sl.Err(err))
 		return nil
 	}
 
-	grpcClient, err := NewGRPClient(cfg.Log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
+	grpcClient, err := NewGRPClient(log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
 	if err != nil {
-		cfg.Log.Error("unable to initialize grpc client", sl.Err(err))
+		log.Error("unable to initialize grpc client", sl.Err(err))
 		return nil
 	}
 
 	srvcs := InitServices(ctx,
-		cfg.Log,
+		log,
 		cfg.InstanceID.String(),
 		cfg.Env,
 		cfg.StreamServiceMock,
-		cfg.Update.LivestreamsTimer,
+		cfg.Update.LivestreamsTimeout,
+		cfg.Update.CategoriesTimeout,
 		grpcClient,
 		rdb,
 		pool)
 
-	handler := CreateHandler(ctx, cfg, srvcs)
+	handler := CreateHandler(ctx, log, cfg, srvcs)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", cfg.HTTP.Host, cfg.HTTP.Port),
@@ -56,9 +74,9 @@ func New(ctx context.Context, cfg Config) *http.Server {
 	return server
 }
 
-func CreateHandler(ctx context.Context, cfg Config, srvcs Services) http.Handler {
+func CreateHandler(ctx context.Context, log *slog.Logger, cfg Config, srvcs Services) http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux, cfg.Log,
+	addRoutes(mux, log,
 		srvcs.Category,
 		srvcs.Livestream,
 		srvcs.Channel,
@@ -85,11 +103,12 @@ func InitServices(ctx context.Context,
 	env string,
 	streamServiceMock bool,
 	lsUpdateTimeout time.Duration,
+	catUpdateTimeout time.Duration,
 	grpcClient auth.GRPCCLient,
 	rdb *redis.Client,
 	pool *pgxpool.Pool) Services {
 	livestreamRepo := livestream.NewRepo(rdb, pool)
-	streamServerAdapter := livestream.NewStreamServerAdapter(log, rdb, livestreamRepo, instanceID)
+	streamServerAdapter := livestream.NewStreamServerAdapter(log, livestreamRepo, instanceID)
 	livestreamsService := livestream.NewService(log, livestreamRepo)
 	streamServerAdapter.Update(ctx, lsUpdateTimeout)
 
@@ -98,8 +117,7 @@ func InitServices(ctx context.Context,
 
 	categoryRepo := category.NewRepo(rdb, pool)
 	categoryUpdater := category.NewUpdater(log, livestreamRepo, categoryRepo)
-	// TODO: change category update timeout
-	categoryUpdater.Update(ctx, lsUpdateTimeout)
+	categoryUpdater.Update(ctx, catUpdateTimeout)
 
 	authDBAdapter := auth.NewAdapter(pool)
 	authService := auth.NewService(log, grpcClient, authDBAdapter)
@@ -139,4 +157,30 @@ func NewGRPClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfi
 
 	log.Info("ENV is not prod and AUTH_SERVICE_MOCK is not false. Initializing mock grpc client.")
 	return &auth.GRPCClientMock{}, nil
+}
+
+func NewLogger(cfg LoggerConfig) *slog.Logger {
+	var lev slog.Leveler
+	switch cfg.Level {
+	case "debug":
+		lev = slog.LevelDebug
+	case "info":
+		lev = slog.LevelInfo
+	case "error":
+		lev = slog.LevelError
+	default:
+		lev = slog.LevelInfo
+	}
+
+	var h slog.Handler
+	switch cfg.Handler {
+	case "text":
+		h = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: lev})
+	case "json":
+		h = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lev})
+	default:
+		h = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: lev})
+	}
+
+	return slog.New(h)
 }

@@ -3,28 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"main/pkg/api/streamserver"
 	"net/http"
 )
-
-type ListStreamServerResponse struct {
-	Code    int          `json:"code"`
-	Server  string       `json:"server"`
-	Service string       `json:"service"`
-	Pid     string       `json:"pid"`
-	Streams []StreamData `json:"streams"`
-}
-
-type GetStreamServerResponse struct {
-	Code    int        `json:"code"`
-	Server  string     `json:"server"`
-	Service string     `json:"service"`
-	Pid     string     `json:"pid"`
-	Stream  StreamData `json:"stream"`
-}
-
-type PostStreamServerRequest struct {
-	Channel string `json:"channel"`
-}
 
 func Get(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -36,8 +17,8 @@ func Get(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		json.NewEncoder(w).Encode(GetStreamServerResponse{
-			Stream: StreamData{
+		json.NewEncoder(w).Encode(streamserver.GetResponse{
+			Stream: streamserver.StreamData{
 				ID:      data.channel,
 				Clients: data.viewers,
 				Name:    data.channel}})
@@ -46,7 +27,7 @@ func Get(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
 
 func Post(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req PostStreamServerRequest
+		var req streamserver.PostRequest
 
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
@@ -77,14 +58,14 @@ func List(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		streams := make([]StreamData, len(data))
+		streams := make([]streamserver.StreamData, len(data))
 		for i := range len(data) {
-			streams[i] = StreamData{
+			streams[i] = streamserver.StreamData{
 				ID:      data[i].channel,
 				Clients: data[i].viewers,
 				Name:    data[i].channel}
 		}
 
-		json.NewEncoder(w).Encode(ListStreamServerResponse{Streams: streams})
+		json.NewEncoder(w).Encode(streamserver.ListResponse{Streams: streams})
 	}
 }

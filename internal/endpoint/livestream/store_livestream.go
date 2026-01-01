@@ -22,6 +22,10 @@ func (r *livestreamStore) Add(ctx context.Context, ls Livestream) *redis.IntCmd 
 	return r.rdb.HSet(ctx, r.Key(strconv.Itoa(int(ls.Id))), ls)
 }
 
+func (r *livestreamStore) TxAdd(ctx context.Context, tx redis.Pipeliner, ls Livestream) *redis.IntCmd {
+	return tx.HSet(ctx, r.Key(strconv.Itoa(int(ls.Id))), ls)
+}
+
 func (r *livestreamStore) List(ctx context.Context, ids []string) ([]Livestream, error) {
 	pipe := r.rdb.Pipeline()
 	cmds := make([]*redis.MapStringStringCmd, len(ids))
@@ -121,4 +125,8 @@ func (r *livestreamStore) Key(id string) string {
 
 func (r *livestreamStore) Delete(ctx context.Context, lsId string) *redis.IntCmd {
 	return r.rdb.Del(ctx, r.Key(lsId))
+}
+
+func (r *livestreamStore) TxDelete(ctx context.Context, tx redis.Pipeliner, lsId string) *redis.IntCmd {
+	return tx.Del(ctx, r.Key(lsId))
 }

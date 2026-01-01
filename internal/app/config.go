@@ -1,17 +1,11 @@
 package app
 
 import (
-	"fmt"
 	"log"
-	"log/slog"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
-	"github.com/redis/go-redis/v9/maintnotifications"
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 const (
@@ -24,121 +18,62 @@ type Config struct {
 	Postgres          PostgresConfig
 	HTTP              HttpServerConfig
 	GRPC              GrpcClientConfig
+	Redis             RedisConfig
+	Logger            LoggerConfig
 	Update            UpdateConfig
-	Redis             *redis.Options
-	Log               *slog.Logger
-	Env               string
+	Env               string `env:"ENV" env-default:"prod"`
 	InstanceID        uuid.UUID
-	AuthServiceMock   bool
-	StreamServiceMock bool
+	AuthServiceMock   bool `env:"AUTH_SERVICE_MOCK" env-default:"false"`
+	StreamServiceMock bool `env:"STREAM_SERVICE_MOCK" env-default:"false"`
 }
 
 func GetConfig() Config {
-	err := godotenv.Load(".env")
+	var cfg Config
+
+	err := cleanenv.ReadConfig(".env", &cfg)
 	if err != nil {
-		log.Println("Error loading .env file")
+		log.Fatalf("config big bad: %v", err)
 	}
+	cfg.InstanceID = uuid.New()
 
-	dbUser := os.Getenv("POSTGRES_USER")
-	dbUserPassword := os.Getenv("POSTGRES_PASSWORD")
-	dbPort := os.Getenv("POSTGRES_PORT")
-	dbName := os.Getenv("POSTGRES_NAME")
-	dbHost := os.Getenv("POSTGRES_HOST")
-	redisPort := os.Getenv("REDIS_PORT")
-	redisHost := os.Getenv("REDIS_HOST")
-	redisPassword := os.Getenv("REDIS_PASSWORD")
-	apiPort := os.Getenv("API_PORT")
-	env := os.Getenv("ENV")
-
-	authServiceMockEnv := os.Getenv("AUTH_SERVICE_MOCK")
-	authServiceMock, err := strconv.ParseBool(authServiceMockEnv)
-	if err != nil {
-		authServiceMock = false
-	}
-
-	streamServiceMockEnv := os.Getenv("STREAM_SERVICE_MOCK")
-	streamServiceMock, err := strconv.ParseBool(streamServiceMockEnv)
-	if err != nil {
-		streamServiceMock = false
-	}
-
-	connURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", dbUser, dbUserPassword, dbHost, dbPort, dbName)
-
-	logger := setupLogger(env)
-	slog.SetDefault(logger)
-
-	return Config{
-		Postgres: PostgresConfig{ConnURL: connURL},
-		Redis: &redis.Options{
-			// https://github.com/redis/go-redis/issues/3536
-			MaintNotificationsConfig: &maintnotifications.Config{
-				Mode: maintnotifications.ModeDisabled,
-			},
-			Addr:     fmt.Sprintf("%s:%s", redisHost, redisPort),
-			Password: redisPassword,
-			DB:       0,
-		},
-		Log: logger,
-		Update: UpdateConfig{
-			CategoriesTimer:  time.Second * 30,
-			LivestreamsTimer: time.Second * 50,
-		},
-		HTTP: HttpServerConfig{
-			Port:         apiPort,
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 25 * time.Second,
-			IdleTimeout:  45 * time.Second,
-		},
-		GRPC: GrpcClientConfig{
-			Host:    "0.0.0.0",
-			Port:    "44044",
-			Timeout: time.Second * 5,
-			Retries: 5,
-		},
-		Env:               env,
-		InstanceID:        uuid.New(),
-		AuthServiceMock:   authServiceMock,
-		StreamServiceMock: streamServiceMock,
-	}
+	return cfg
 }
 
 type HttpServerConfig struct {
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	IdleTimeout  time.Duration
-	Port         string
-	Host         string
+	Host         string        `env:"HTTP_HOST" env-default:"0.0.0.0"`
+	Port         string        `env:"HTTP_PORT" env-default:"8090"`
+	ReadTimeout  time.Duration `env:"HTTP_READ_TIMEOUT" env-default:"30s"`
+	WriteTimeout time.Duration `env:"HTTP_WRITE_TIMEOUT" env-default:"30s"`
+	IdleTimeout  time.Duration `env:"HTTP_IDLE_TIMEOUT" env-default:"30s"`
 }
 
 type UpdateConfig struct {
-	CategoriesTimer  time.Duration
-	LivestreamsTimer time.Duration
+	LivestreamsTimeout time.Duration `env:"UPDATE_LIVESTREAMS_TIMEOUT_SECONDS" env-default:"15s"`
+	CategoriesTimeout  time.Duration `env:"UPDATE_CATEGORIES_TIMEOUT_SECONDS" env-default:"10s"`
 }
 
 type PostgresConfig struct {
-	ConnURL string
+	Host     string `env:"POSTGRES_HOST" env-default:"localhost"`
+	Port     string `env:"POSTGRES_PORT" env-default:"5432"`
+	User     string `env:"POSTGRES_USER" env-default:"cherry"`
+	Name     string `env:"POSTGRES_NAME" env-default:"twitchclone"`
+	Password string `env:"POSTGRES_PASSWORD"`
+}
+
+type RedisConfig struct {
+	Host     string `env:"REDIS_HOST" env-default:"127.0.0.1"`
+	Port     string `env:"REDIS_PORT" env-default:"6379"`
+	Password string `env:"REDIS_PASSWORD"`
 }
 
 type GrpcClientConfig struct {
-	Host    string
-	Port    string
-	Timeout time.Duration
-	Retries int
+	Host    string        `env:"GRPC_CLIENT_HOST" env-default:"0.0.0.0"`
+	Port    string        `env:"GRPC_CLIENT_PORT" env-default:"44044"`
+	Timeout time.Duration `env:"GRPC_CLIENT_TIMEOUT_SECONDS" env-default:"5s"`
+	Retries int           `env:"GRPC_CLIENT_RETRIES" env-default:"3"`
 }
 
-func setupLogger(env string) *slog.Logger {
-	switch env {
-	case envLocal:
-		return slog.New(
-			slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	case envDev:
-		return slog.New(
-			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	case envProd:
-		return slog.New(
-			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	default:
-		return slog.New(
-			slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	}
+type LoggerConfig struct {
+	Level   string `env:"LOG_LEVEL" env-default:"debug"`
+	Handler string `env:"LOG_HANDLER" env-default:"text"`
 }

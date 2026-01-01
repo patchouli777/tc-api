@@ -3,21 +3,20 @@ package livestream
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"main/internal/lib/sl"
+	"main/pkg/api/streamserver"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/RussellLuo/timingwheel"
-	"github.com/redis/go-redis/v9"
 )
 
-type updater interface {
+type CreaterUpdater interface {
 	Updater
 	Creater
 }
@@ -27,11 +26,10 @@ type StreamServerAdapter struct {
 	endpoint   string
 	wheel      *timingwheel.TimingWheel
 	InstanceID string
-	lsr        updater
+	lsr        CreaterUpdater
 }
 
-func NewStreamServerAdapter(log *slog.Logger, rdb *redis.Client, lsr updater,
-	InstanceID string) *StreamServerAdapter {
+func NewStreamServerAdapter(log *slog.Logger, lsr CreaterUpdater, InstanceID string) *StreamServerAdapter {
 	wheel := timingwheel.NewTimingWheel(5*time.Second, 16)
 
 	return &StreamServerAdapter{
@@ -42,32 +40,56 @@ func NewStreamServerAdapter(log *slog.Logger, rdb *redis.Client, lsr updater,
 		endpoint:   "http://localhost:1985/api/v1/streams"}
 }
 
-func (u *StreamServerAdapter) List(ctx context.Context) (*StreamServerResponse, error) {
+func (u *StreamServerAdapter) List(ctx context.Context) (*streamserver.ListResponse, error) {
+	const op = "livestream.StreamServerAdapter.List"
+
 	cl := &http.Client{}
 	response, err := cl.Get(u.endpoint)
 	if err != nil {
-		u.log.Error("unable to get livestreams from server", sl.Err(err))
+		u.log.Error("unable to get livestreams from server", sl.Err(err), slog.String("op", op))
 		return nil, err
 	}
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		u.log.Error("unable to read response from streaming server", sl.Err(err))
+		u.log.Error("unable to read response from streaming server", sl.Err(err), slog.String("op", op))
 		return nil, err
 	}
 
-	var resp StreamServerResponse
+	var resp streamserver.ListResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		u.log.Error("unable to unmarshal response from streaming server", sl.Err(err))
+		u.log.Error("unable to unmarshal response from streaming server", sl.Err(err), slog.String("op", op))
 		return nil, err
 	}
 
 	return &resp, nil
 }
 
-func (u *StreamServerAdapter) Get(ctx context.Context) (*StreamServerResponse, error) {
-	return nil, errors.New("not implemented")
+func (u *StreamServerAdapter) Get(ctx context.Context, channel string) (*streamserver.GetResponse, error) {
+	const op = "livestream.StreamServerAdapter.Get"
+
+	cl := &http.Client{}
+	response, err := cl.Get(u.endpoint)
+	if err != nil {
+		u.log.Error("unable to get livestream from server", sl.Err(err), slog.String("channel", channel), slog.String("op", op))
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		u.log.Error("unable to read response from streaming server", sl.Err(err), slog.String("op", op))
+		return nil, err
+	}
+
+	var resp streamserver.GetResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		u.log.Error("unable to unmarshal response from streaming server", sl.Err(err), slog.String("op", op))
+		return nil, err
+	}
+
+	return &resp, nil
 }
 
 // TODO: adapter must respect context
@@ -111,45 +133,4 @@ func (u *StreamServerAdapter) Update(ctx context.Context, timeout time.Duration)
 			time.Sleep(timeout)
 		}
 	}()
-}
-
-type StreamServerResponse struct {
-	Code    int    `json:"code"`
-	Server  string `json:"server"`
-	Service string `json:"service"`
-	Pid     string `json:"pid"`
-	Streams []struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		Vhost     string `json:"vhost"`
-		App       string `json:"app"`
-		TcURL     string `json:"tcUrl"`
-		URL       string `json:"url"`
-		LiveMs    int64  `json:"live_ms"`
-		Clients   int    `json:"clients"`
-		Frames    int    `json:"frames"`
-		SendBytes int    `json:"send_bytes"`
-		RecvBytes int    `json:"recv_bytes"`
-		Kbps      struct {
-			Recv30S int `json:"recv_30s"`
-			Send30S int `json:"send_30s"`
-		} `json:"kbps"`
-		Publish struct {
-			Active bool   `json:"active"`
-			Cid    string `json:"cid"`
-		} `json:"publish"`
-		Video struct {
-			Codec   string `json:"codec"`
-			Profile string `json:"profile"`
-			Level   string `json:"level"`
-			Width   int    `json:"width"`
-			Height  int    `json:"height"`
-		} `json:"video"`
-		Audio struct {
-			Codec      string `json:"codec"`
-			SampleRate int    `json:"sample_rate"`
-			Channel    int    `json:"channel"`
-			Profile    string `json:"profile"`
-		} `json:"audio"`
-	} `json:"streams"`
 }

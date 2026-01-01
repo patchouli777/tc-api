@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"main/internal/endpoint/auth"
 	"main/internal/endpoint/category"
 	"main/internal/endpoint/follow"
@@ -30,6 +31,8 @@ func Populate(ctx context.Context,
 }
 
 func addCategories(ctx context.Context, cr *category.RepositoryImpl) {
+	slog.Info("adding categories")
+
 	categoriesLen := min(categoriesCount, len(categories))
 	categories = categories[:categoriesLen]
 
@@ -46,9 +49,13 @@ func addCategories(ctx context.Context, cr *category.RepositoryImpl) {
 			log.Fatalf("unable to add category: %v", err)
 		}
 	}
+
+	slog.Info("categories added")
 }
 
 func addUsers(ctx context.Context, pool *pgxpool.Pool) {
+	slog.Info("adding users")
+
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		log.Fatalf("unable to acquire connection: %v", err)
@@ -60,9 +67,13 @@ func addUsers(ctx context.Context, pool *pgxpool.Pool) {
 		log.Fatalf("unable to add users: %v", err)
 	}
 	r.Close()
+
+	slog.Info("users added")
 }
 
 func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *livestream.StreamServerAdapter) {
+	slog.Info("starting livestreams")
+
 	cl := livestreamApi.NewStreamServerClient()
 
 	for i := range streamsCount {
@@ -71,9 +82,13 @@ func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *live
 			log.Fatalf("unable to start livestream: %v", err)
 		}
 	}
+
+	slog.Info("livestreams started")
 }
 
 func addTags(ctx context.Context, pool *pgxpool.Pool) {
+	slog.Info("adding tags")
+
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		log.Fatalf("unable to acquire connection: %v", err)
@@ -85,15 +100,21 @@ func addTags(ctx context.Context, pool *pgxpool.Pool) {
 		log.Fatalf("unable to add tags: %v", err)
 	}
 	r.Close()
+
+	slog.Info("tags added")
 }
 
 func addFollows(ctx context.Context, fs *follow.ServiceImpl) {
+	slog.Info("adding follows")
+
 	for i := range followCount {
 		err := fs.Follow(ctx, "user1", fmt.Sprintf("user%d", i))
 		if err != nil {
 			log.Fatalf("unable to follow a user: %v", err)
 		}
 	}
+
+	slog.Info("follows added")
 }
 
 // TODO: batch insert in user repo/service???

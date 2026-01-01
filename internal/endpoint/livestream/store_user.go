@@ -16,12 +16,20 @@ func (r *userToIdStore) Delete(ctx context.Context, username string) *redis.IntC
 	return r.rdb.Del(ctx, r.Key(username))
 }
 
+func (r *userToIdStore) TxDelete(ctx context.Context, tx redis.Pipeliner, username string) *redis.IntCmd {
+	return tx.Del(ctx, r.Key(username))
+}
+
 func (r *userToIdStore) Key(username string) string {
 	return fmt.Sprintf("livestreams_ids:%s", username)
 }
 
 func (r *userToIdStore) Add(ctx context.Context, username string, lsId string) (*redis.StatusCmd, error) {
 	return r.rdb.Set(ctx, r.Key(username), lsId, 0), nil
+}
+
+func (r *userToIdStore) TxAdd(ctx context.Context, tx redis.Pipeliner, username string, lsId string) *redis.StatusCmd {
+	return tx.Set(ctx, r.Key(username), lsId, 0)
 }
 
 func (r *userToIdStore) Get(ctx context.Context, username string) (*string, error) {

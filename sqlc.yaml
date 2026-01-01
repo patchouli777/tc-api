@@ -1,7 +1,7 @@
 version: "2"
 servers:
 - engine: postgresql
-  uri: "postgres://less:123@localhost:5432/twitchclone"
+  uri: "postgres://cherry:123@localhost:5432/twitchclone"
 sql:
   - engine: "postgresql"
     queries: "internal/endpoint/category/queries.category.sql"

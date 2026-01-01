@@ -116,12 +116,20 @@ type TcLivestream struct {
 	ID            int32
 	IDUser        int32
 	IDCategory    int32
-	IsLive        bool
 	Viewers       int32
 	Title         pgtype.Text
-	StartedAt     pgtype.Int4
-	EndedAt       pgtype.Int4
+	IsLive        bool
+	StartedAt     pgtype.Timestamptz
 	IsMultistream bool
+}
+
+type TcLivestreamHistory struct {
+	ID         int32
+	IDUser     int32
+	IDCategory int32
+	Title      pgtype.Text
+	StartedAt  pgtype.Timestamptz
+	EndedAt    pgtype.Timestamptz
 }
 
 type TcSubscriptionTier struct {
@@ -159,7 +167,7 @@ type TcUserChatEvent struct {
 	IDChannel   int32
 	IDModerator int32
 	IDUser      int32
-	CreatedAt   pgtype.Date
+	CreatedAt   pgtype.Timestamptz
 	ChatEvent   ChatEventEnum
 	TimeoutFor  pgtype.Int4
 }

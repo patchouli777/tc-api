@@ -20,6 +20,10 @@ func (r *idStore) Add(ctx context.Context, id string) error {
 	return r.rdb.SAdd(ctx, r.key(), id).Err()
 }
 
+func (r *idStore) TxAdd(ctx context.Context, tx redis.Pipeliner, id string) *redis.IntCmd {
+	return tx.SAdd(ctx, r.key(), id)
+}
+
 func (r *idStore) GetAll(ctx context.Context) ([]string, error) {
 	res, err := r.rdb.SMembers(ctx, r.key()).Result()
 	return res, err
@@ -31,4 +35,8 @@ func (r *idStore) Exist(ctx context.Context, id string) (bool, error) {
 
 func (r *idStore) Delete(ctx context.Context, id string) error {
 	return r.rdb.SRem(ctx, r.key(), id).Err()
+}
+
+func (r *idStore) TxDelete(ctx context.Context, tx redis.Pipeliner, id string) *redis.IntCmd {
+	return tx.SRem(ctx, r.key(), id)
 }

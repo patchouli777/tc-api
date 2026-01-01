@@ -20,6 +20,10 @@ func (r *sortedIDStore) Delete(ctx context.Context, categoryLink string) *redis.
 	return r.rdb.Del(ctx, r.Key(categoryLink))
 }
 
+func (r *sortedIDStore) TxDelete(ctx context.Context, tx redis.Pipeliner, categoryLink string) *redis.IntCmd {
+	return tx.Del(ctx, r.Key(categoryLink))
+}
+
 func (r *sortedIDStore) Get(ctx context.Context, category string, page, count int) ([]string, error) {
 	ids, err := r.rdb.ZRevRangeByScore(ctx, r.Key(category), &redis.ZRangeBy{
 		Offset: int64((page - 1) * count),
@@ -36,6 +40,13 @@ func (r *sortedIDStore) Get(ctx context.Context, category string, page, count in
 
 func (r *sortedIDStore) Add(ctx context.Context, categoryLink string, score int32, id string) *redis.IntCmd {
 	return r.rdb.ZAdd(ctx, r.Key(categoryLink), redis.Z{
+		Score:  float64(score),
+		Member: id,
+	})
+}
+
+func (r *sortedIDStore) TxAdd(ctx context.Context, tx redis.Pipeliner, categoryLink string, score int32, id string) *redis.IntCmd {
+	return tx.ZAdd(ctx, r.Key(categoryLink), redis.Z{
 		Score:  float64(score),
 		Member: id,
 	})

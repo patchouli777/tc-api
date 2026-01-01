@@ -14,9 +14,14 @@ type LivestreamLister interface {
 	List(ctx context.Context, category string, page, count int) ([]livestream.Livestream, error)
 }
 
+type listerViewerUpdater interface {
+	Lister
+	ViewerUpdater
+}
+
 type CategoryUpdater struct {
 	lsr LivestreamLister
-	cr  Repository
+	cr  listerViewerUpdater
 	log *slog.Logger
 }
 
