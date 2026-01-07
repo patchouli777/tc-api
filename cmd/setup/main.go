@@ -46,19 +46,16 @@ func main() {
 
 	setup.RecreateSchema(pool, rdb)
 
-	srvcs := app.InitServices(ctx, log,
+	srvcs := app.InitApp(ctx, log,
 		cfg.InstanceID.String(),
 		cfg.Env,
-		cfg.StreamServiceMock,
-		cfg.Update.LivestreamsTimeout,
-		cfg.Update.CategoriesTimeout,
 		&auth.GRPCClientMock{},
 		rdb,
 		pool)
 
 	setup.Populate(ctx, pool,
 		srvcs.Auth,
-		srvcs.SSAdapter,
+		srvcs.StreamServerAdapter,
 		srvcs.Category,
 		srvcs.Follow,
 		srvcs.User)

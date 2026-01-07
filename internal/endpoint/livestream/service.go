@@ -3,7 +3,6 @@ package livestream
 import (
 	"context"
 	"fmt"
-	"log/slog"
 )
 
 type Getter interface {
@@ -39,18 +38,19 @@ type Repository interface {
 }
 
 type ServiceImpl struct {
-	log  *slog.Logger
 	repo Repository
 }
 
-func NewService(log *slog.Logger, repo Repository) *ServiceImpl {
-	return &ServiceImpl{log: log, repo: repo}
+func NewService(repo Repository) *ServiceImpl {
+	return &ServiceImpl{repo: repo}
 }
 
+// TODO: livestream id in repo
 func (s *ServiceImpl) Get(ctx context.Context, username string) (*Livestream, error) {
 	ls, err := s.repo.Get(ctx, username)
 	if err != nil {
-		return nil, fmt.Errorf("unable to find livestream: %w", err)
+		// TODO: sentinel errors from repos
+		return nil, fmt.Errorf("unable to find livestream. %w", err)
 	}
 
 	return ls, nil
@@ -68,7 +68,7 @@ func (s *ServiceImpl) List(ctx context.Context, search LivestreamSearch) ([]Live
 	if search.CategoryId != "" {
 		list, err := s.repo.ListById(ctx, search.CategoryId, search.Page, search.Count)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get list of livestreams: %v", err)
+			return nil, fmt.Errorf("unable to get list of livestreams: %w", err)
 		}
 		return list, nil
 	}
@@ -76,7 +76,7 @@ func (s *ServiceImpl) List(ctx context.Context, search LivestreamSearch) ([]Live
 	list, err := s.repo.List(ctx, search.Category, search.Page, search.Count)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to get list of livestreams: %v", err)
+		return nil, fmt.Errorf("unable to get list of livestreams: %w", err)
 	}
 	return list, nil
 }
@@ -90,15 +90,16 @@ func (s *ServiceImpl) UpdateViewers(ctx context.Context, user string, viewers in
 	return nil
 }
 
+// TODO: pipe get + update
 func (s *ServiceImpl) Update(ctx context.Context, user string, upd LivestreamUpdate) (bool, error) {
 	current, err := s.repo.Get(ctx, user)
 	if err != nil {
-		return false, fmt.Errorf("unable to find livestream: %v", err)
+		return false, fmt.Errorf("unable to find livestream: %w", err)
 	}
 
 	_, err = s.repo.Update(ctx, current, upd)
 	if err != nil {
-		return false, fmt.Errorf("unable to update livestream: %v", err)
+		return false, fmt.Errorf("unable to update livestream: %w", err)
 	}
 
 	return true, nil

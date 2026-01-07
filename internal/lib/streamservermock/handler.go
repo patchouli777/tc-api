@@ -1,4 +1,4 @@
-package main
+package streamservermock
 
 import (
 	"encoding/json"

@@ -57,7 +57,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 	id, err := r.userMap.Get(ctx, cr.Username)
 
 	if id != nil {
-		return nil, ErrAlreadyStarted
+		return nil, errAlreadyStarted
 	}
 
 	if err != nil && err != redis.Nil {
@@ -108,7 +108,7 @@ func (r *RepositoryImpl) Get(ctx context.Context, username string) (*Livestream,
 	lsId, err := r.userMap.Get(ctx, username)
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return nil, ErrNotFound
+			return nil, errNotFound
 		}
 
 		return nil, fmt.Errorf("unable to find %s's livestream: %w", username, err)
@@ -265,7 +265,7 @@ func (r *RepositoryImpl) Delete(ctx context.Context, username string) (bool, err
 	}
 
 	if lsId == nil {
-		return false, ErrAlreadyEnded
+		return false, errAlreadyEnded
 	}
 
 	ls, err := r.store.Get(ctx, *lsId)
@@ -283,20 +283,20 @@ func (r *RepositoryImpl) Delete(ctx context.Context, username string) (bool, err
 
 	_, err = tx.Exec(ctx)
 	if err != nil {
-		return false, fmt.Errorf("transaction failed: %v", err)
+		return false, fmt.Errorf("transaction failed: %w", err)
 	}
 
 	if userMapCmd.Err() != nil {
-		return false, fmt.Errorf("unable to delete livestream from userMap: %v", userMapCmd.Err())
+		return false, fmt.Errorf("unable to delete livestream from userMap: %w", userMapCmd.Err())
 	}
 	if sortedCmd.Err() != nil {
-		return false, fmt.Errorf("unable to delete livestream from sorted set: %v", sortedCmd.Err())
+		return false, fmt.Errorf("unable to delete livestream from sorted set: %w", sortedCmd.Err())
 	}
 	if storeCmd.Err() != nil {
-		return false, fmt.Errorf("unable to delete livestream from set: %v", storeCmd.Err())
+		return false, fmt.Errorf("unable to delete livestream from set: %w", storeCmd.Err())
 	}
 	if idsCmd.Err() != nil {
-		return false, fmt.Errorf("unable to delete livestream id from set: %v", idsCmd.Err())
+		return false, fmt.Errorf("unable to delete livestream id from set: %w", idsCmd.Err())
 	}
 
 	conn, err := r.pool.Acquire(ctx)
@@ -314,7 +314,6 @@ func (r *RepositoryImpl) Delete(ctx context.Context, username string) (bool, err
 	return true, nil
 }
 
-// NOTE: transaction + pipeline made this 2x+ faster !! (from 6.5ms avg to 3 ms avg) lets go!!!
 func (r *RepositoryImpl) addLivestream(ctx context.Context, ls Livestream) error {
 	lsIdStr := strconv.Itoa(int(ls.Id))
 
@@ -327,20 +326,20 @@ func (r *RepositoryImpl) addLivestream(ctx context.Context, ls Livestream) error
 
 	_, err := tx.Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("transaction failed: %v", err)
+		return fmt.Errorf("transaction failed: %w", err)
 	}
 
 	if userMapCmd.Err() != nil {
-		return fmt.Errorf("unable to add livestream to userMap: %v", userMapCmd.Err())
+		return fmt.Errorf("unable to add livestream to userMap: %w", userMapCmd.Err())
 	}
 	if sortedCmd.Err() != nil {
-		return fmt.Errorf("unable to add livestream to sorted set: %v", sortedCmd.Err())
+		return fmt.Errorf("unable to add livestream to sorted set: %w", sortedCmd.Err())
 	}
 	if storeCmd.Err() != nil {
-		return fmt.Errorf("unable to add livestream to set: %v", storeCmd.Err())
+		return fmt.Errorf("unable to add livestream to set: %w", storeCmd.Err())
 	}
 	if idsCmd.Err() != nil {
-		return fmt.Errorf("unable to add livestream id to set: %v", idsCmd.Err())
+		return fmt.Errorf("unable to add livestream id to set: %w", idsCmd.Err())
 	}
 
 	return nil

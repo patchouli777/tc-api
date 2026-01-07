@@ -3,9 +3,8 @@ package channel
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
-	"main/internal/lib/er"
+	"main/internal/lib/handler"
 	c "main/pkg/api/channel"
 	"net/http"
 )
@@ -31,15 +30,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	channel := r.PathValue("channel")
 
 	if channel == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("channel is not present in the request"), op, "channel is not present in the request")
+		handler.Error(h.log, w, op, errNotPresent, http.StatusBadRequest, errNotPresent.Error())
 		return
 	}
 
 	chann, err := h.cs.Get(r.Context(), channel)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -60,14 +57,12 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	var channelUpdate ChannelUpdate
 	if err := json.NewDecoder(r.Body).Decode(&channelUpdate); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
 	if err := h.cs.Update(r.Context(), channelUpdate); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 

@@ -3,10 +3,10 @@ package category
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"log/slog"
 	"main/internal/auth"
-	"main/internal/lib/er"
+	"main/internal/lib/handler"
 	"main/internal/lib/sl"
 	c "main/pkg/api/category"
 	"net/http"
@@ -55,6 +55,12 @@ type Handler struct {
 	log  *slog.Logger
 }
 
+// TODO: remove
+// handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
+// handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
+// handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
+// handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
+
 func NewHandler(log *slog.Logger, repo Repository) *Handler {
 	return &Handler{repo: repo, log: log}
 }
@@ -68,7 +74,7 @@ func NewHandler(log *slog.Logger, repo Repository) *Handler {
 // @Accept json
 // @Produce json
 // @Success 200 {object} GetResponse "Category found successfully"
-// @Failure 500 {object} er.RequestError "Internal server error"
+// @Failure 500 {object} handler.RequestError "Internal server error"
 // @Router /categories/{categoryIdentifier} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	const op = "getting category"
@@ -82,8 +88,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		res, err := h.repo.GetById(ctx, categoryId)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			er.HandlerError(h.log, w, err, op, "internal error")
+			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 			return
 		}
 
@@ -91,8 +96,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	} else {
 		res, err := h.repo.GetByLink(ctx, categoryIdentifier)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			er.HandlerError(h.log, w, err, op, "internal error")
+			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 			return
 		}
 
@@ -121,8 +125,8 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 // @Param count query int false "Number of items per page" default(10)
 // @Param sort query string false "Sort order (asc or desc)" Enums(asc, desc) default(desc)
 // @Success 200 {object} ListResponse "List of categories"
-// @Failure 400 {object} er.RequestError "Invalid query parameter"
-// @Failure 500 {object} er.RequestError "Internal server error while fetching categories"
+// @Failure 400 {object} handler.RequestError "Invalid query parameter"
+// @Failure 500 {object} handler.RequestError "Internal server error while fetching categories"
 // @Router /categories [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	const op = "getting categories"
@@ -137,8 +141,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	pageInt, err := strconv.Atoi(page)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "incorrect page parameter")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgBadPage)
 		return
 	}
 
@@ -148,8 +151,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	countInt, err := strconv.Atoi(count)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "incorrect count parameter")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgBadCount)
 		return
 	}
 
@@ -158,8 +160,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sort != "asc" && sort != "desc" {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("incorrect sort parameter: %s", sort), op, "incorrect sort parameter")
+		handler.Error(h.log, w, op, handler.ErrBadSort, http.StatusBadRequest, handler.MsgBadSort)
 		return
 	}
 
@@ -169,8 +170,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		Sort:  sort,
 	})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -198,8 +198,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param request body PostRequest true "Category creation request body"
 // @Success 204 "No Content - category created successfully"
-// @Failure 400 {object} er.RequestError "Bad Request: invalid data"
-// @Failure 500 {object} er.RequestError "Internal Server Error: failed to add category"
+// @Failure 400 {object} handler.RequestError "Bad Request: invalid data"
+// @Failure 500 {object} handler.RequestError "Internal Server Error: failed to add category"
 // @Router /categories [post]
 func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	const op = "creating category"
@@ -207,24 +207,21 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cl := ctx.Value(auth.AuthContextKey{})
 	claims, ok := cl.(*auth.Claims)
+
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("parsing claims"), op, "identity is not confirmed")
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	if claims.Role != "staff" {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("you are not allowed to perform this operation"),
-			op, "you are not allowed to perform this operation")
+		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.ErrNotAllowed.Error())
 		return
 	}
 
 	var req c.PostRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
@@ -236,8 +233,12 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		Tags:      req.Tags,
 	})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		if errors.Is(err, errAlreadyExists) {
+			handler.Error(h.log, w, op, err, http.StatusInternalServerError, errAlreadyExists.Error())
+			return
+		}
+
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -254,8 +255,8 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 // @Param categoryIdentifier path string true "Category identifier (either numeric ID or unique link)"
 // @Param patchRequest body PatchRequest true "Fields to update in the category"
 // @Success 204 "No Content - category updated successfully"
-// @Failure 400 {object} er.RequestError "Invalid request data"
-// @Failure 500 {object} er.RequestError "Internal server error"
+// @Failure 400 {object} handler.RequestError "Invalid request data"
+// @Failure 500 {object} handler.RequestError "Internal server error"
 // @Router /categories/{categoryIdentifier} [patch]
 func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	const op = "updating category"
@@ -263,24 +264,21 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cl := ctx.Value(auth.AuthContextKey{})
 	claims, ok := cl.(*auth.Claims)
+
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("parsing claims"), op, "identity is not confirmed")
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	if claims.Role != "staff" {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("you are not allowed to perform this operation"),
-			op, "you are not allowed to perform this operation")
+		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	var request c.PatchRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
@@ -297,8 +295,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 			IsSafe:    request.IsSafe,
 		})
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			er.HandlerError(h.log, w, err, op, "internal error")
+			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 			return
 		}
 
@@ -314,8 +311,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		IsSafe:    request.IsSafe,
 	})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -331,7 +327,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Success 204 "No Content - category delted successfully"
-// @Failure 500 {object} er.RequestError "Internal server error"
+// @Failure 500 {object} handler.RequestError "Internal server error"
 // @Router /categories/{categoryIdentifier} [delete]
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	const op = "deleting category"
@@ -339,16 +335,14 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cl := ctx.Value(auth.AuthContextKey{})
 	claims, ok := cl.(*auth.Claims)
+
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("parsing claims"), op, "identity is not confirmed")
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	if claims.Role != "staff" {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("you are not allowed to perform this operation"),
-			op, "you are not allowed to perform this operation")
+		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.ErrNotAllowed.Error())
 		return
 	}
 
@@ -359,16 +353,14 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	} else {
 		err := h.repo.DeleteById(ctx, categoryId)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			er.HandlerError(h.log, w, err, op, "internal error")
+			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 			return
 		}
 	}
 
 	err = h.repo.DeleteByLink(ctx, categoryIdentifier)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 

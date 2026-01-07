@@ -2,8 +2,7 @@ package user
 
 import (
 	"context"
-	"log/slog"
-	"main/internal/lib/sl"
+	"fmt"
 )
 
 type Repository interface {
@@ -15,69 +14,53 @@ type Repository interface {
 }
 
 type ServiceImpl struct {
-	r   Repository
-	log *slog.Logger
+	r Repository
 }
 
-func NewService(log *slog.Logger, r Repository) *ServiceImpl {
-	return &ServiceImpl{log: log, r: r}
+func NewService(r Repository) *ServiceImpl {
+	return &ServiceImpl{r: r}
 }
 
 func (s *ServiceImpl) List(ctx context.Context, ul UserList) ([]User, error) {
-	const op = "user.Service.List"
-
 	users, err := s.r.List(ctx, ul)
 	if err != nil {
-		s.log.Error(op, sl.Err(err))
-		return nil, err
+		return nil, fmt.Errorf("unable to list users: %w: ", err)
 	}
 
 	return users, nil
 }
 
 func (s *ServiceImpl) Get(ctx context.Context, username string) (*User, error) {
-	const op = "user.Service.Get"
-
 	user, err := s.r.Get(ctx, username)
 	if err != nil {
-		s.log.Error(op, sl.Err(err))
-		return nil, err
+		return nil, fmt.Errorf("unable to get user: %w", err)
 	}
 
 	return user, nil
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, uc UserCreate) error {
-	const op = "user.Service.Create"
-
 	err := s.r.Create(ctx, uc)
 	if err != nil {
-		s.log.Error(op, sl.Err(err))
-		return err
+		return fmt.Errorf("unable to create user: %w", err)
 	}
 
 	return nil
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, uu UserUpdate) error {
-	const op = "user.Service.Update"
-
 	err := s.r.Update(ctx, uu)
 	if err != nil {
-		s.log.Error(op, sl.Err(err))
-		return err
+		return fmt.Errorf("unable to update user: %w", err)
 	}
 
 	return nil
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, id int) error {
-	const op = "user.Service.Delete"
-
 	err := s.r.Delete(ctx, id)
 	if err != nil {
-		s.log.Error(op, sl.Err(err))
-		return err
+		return fmt.Errorf("unable to delete user: %w", err)
 	}
 
 	return nil

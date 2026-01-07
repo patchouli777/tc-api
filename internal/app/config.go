@@ -2,6 +2,7 @@ package app
 
 import (
 	"log"
+	"main/pkg/util"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,22 +16,22 @@ const (
 )
 
 type Config struct {
-	Postgres          PostgresConfig
-	HTTP              HttpServerConfig
-	GRPC              GrpcClientConfig
-	Redis             RedisConfig
-	Logger            LoggerConfig
-	Update            UpdateConfig
-	Env               string `env:"ENV" env-default:"prod"`
-	InstanceID        uuid.UUID
-	AuthServiceMock   bool `env:"AUTH_SERVICE_MOCK" env-default:"false"`
-	StreamServiceMock bool `env:"STREAM_SERVICE_MOCK" env-default:"false"`
+	Postgres        PostgresConfig
+	HTTP            HttpServerConfig
+	GRPC            GrpcClientConfig
+	Redis           RedisConfig
+	Logger          LoggerConfig
+	Update          UpdateConfig
+	Env             string `env:"ENV" env-default:"prod"`
+	InstanceID      uuid.UUID
+	AuthServiceMock bool `env:"AUTH_SERVICE_MOCK" env-default:"false"`
 }
 
 func GetConfig() Config {
 	var cfg Config
 
-	err := cleanenv.ReadConfig(".env", &cfg)
+	root := util.GetProjectRoot()
+	err := cleanenv.ReadConfig(root+"\\.env", &cfg)
 	if err != nil {
 		log.Fatalf("config big bad: %v", err)
 	}
@@ -56,7 +57,7 @@ type PostgresConfig struct {
 	Host     string `env:"POSTGRES_HOST" env-default:"localhost"`
 	Port     string `env:"POSTGRES_PORT" env-default:"5432"`
 	User     string `env:"POSTGRES_USER" env-default:"cherry"`
-	Name     string `env:"POSTGRES_NAME" env-default:"twitchclone"`
+	Name     string `env:"POSTGRES_DB" env-default:"baklava"`
 	Password string `env:"POSTGRES_PASSWORD"`
 }
 

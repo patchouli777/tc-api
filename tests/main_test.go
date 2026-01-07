@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"main/internal/app"
+	"main/internal/endpoint/auth"
 	"main/internal/lib/setup"
 	"main/internal/lib/sl"
+	"main/internal/lib/streamservermock"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -19,31 +21,117 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var pgpool *pgxpool.Pool
-var rclient *redis.Client
-var ts *httptest.Server
+var (
+	pgpool  *pgxpool.Pool
+	rclient *redis.Client
+	pool    *dockertest.Pool
+	ts      *httptest.Server
+	log     *slog.Logger
+)
 
 func TestMain(m *testing.M) {
-	var exitCode int
-
-	defer func() { os.Exit(exitCode) }()
-
 	ctx := context.Background()
 	cfg := app.GetConfig()
-	log := cfg.Log
 
+	log = app.NewLogger(cfg.Logger)
+	log.With(slog.String("env", "tests"))
+	slog.SetDefault(log)
+
+	dockerPool, err := initDockerPool()
+	if err != nil {
+		log.Error("unable to init docker pool", sl.Err(err))
+		os.Exit(1)
+	}
+	pool = dockerPool
+
+	redisRes, err := initRedis(ctx, cfg.Redis)
+	if err != nil {
+		log.Error("unable to init redis", sl.Err(err))
+		os.Exit(1)
+	}
+
+	defer func() {
+		if err := pool.Purge(redisRes); err != nil {
+			log.Error("unable to purge redis resource", sl.Err(err))
+		}
+	}()
+
+	pgRes, err := initPostgres(ctx, cfg.Postgres)
+	if err != nil {
+		log.Error("unable to init postgres", sl.Err(err))
+		os.Exit(1)
+	}
+
+	defer func() {
+		if err := pool.Purge(pgRes); err != nil {
+			log.Error("unable to purge pg resource", sl.Err(err))
+		}
+	}()
+
+	grpcClient, err := initGRPC(cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
+	if err != nil {
+		log.Error("unable to init grpc client", sl.Err(err))
+		os.Exit(1)
+	}
+
+	go func() {
+		err = streamservermock.Run(ctx)
+		if err != nil {
+			log.Error("unable to init stream server mock", sl.Err(err))
+			os.Exit(1)
+		}
+	}()
+
+	srvcs := app.InitApp(ctx, log,
+		cfg.InstanceID.String(),
+		cfg.Env,
+		grpcClient,
+		rclient,
+		pgpool)
+
+	setup.RecreateSchema(pgpool, rclient)
+	setup.Populate(ctx, pgpool,
+		srvcs.Auth,
+		srvcs.StreamServerAdapter,
+		srvcs.Category,
+		srvcs.Follow,
+		srvcs.User)
+	srvcs.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
+	srvcs.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
+
+	handler := app.CreateHandler(ctx, log, cfg, srvcs)
+	ts = httptest.NewServer(handler)
+	defer ts.Close()
+
+	m.Run()
+
+	// if err := pool.Purge(redisRes); err != nil {
+	// 	log.Error("unable to purge redis resource", sl.Err(err))
+	// }
+
+	// if err := pool.Purge(pgRes); err != nil {
+	// 	log.Error("unable to purge pg resource", sl.Err(err))
+	// }
+}
+
+func initDockerPool() (*dockertest.Pool, error) {
 	pool, err := dockertest.NewPool("")
 	if err != nil {
 		log.Error("unable to construct dockertest pool", sl.Err(err))
-		return
+		return nil, err
 	}
 
 	err = pool.Client.Ping()
 	if err != nil {
 		log.Error("unable to connect to docker", sl.Err(err))
-		return
+		return nil, err
 	}
 
+	return pool, nil
+}
+
+// creates resource AND connects to redis. redis client is available as global variable "rclient"
+func initRedis(ctx context.Context, cfg app.RedisConfig) (*dockertest.Resource, error) {
 	redisRes, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "redis",
 		Tag:        "latest",
@@ -53,7 +141,7 @@ func TestMain(m *testing.M) {
 	})
 	if err != nil {
 		log.Error("unable to start redis resource", sl.Err(err))
-		return
+		return nil, err
 	}
 
 	if err = pool.Retry(func() error {
@@ -61,28 +149,24 @@ func TestMain(m *testing.M) {
 			Addr: fmt.Sprintf("localhost:%s", redisRes.GetPort("6379/tcp")),
 		})
 
-		// rclient = redis.NewClient(cfg.Redis)
-
 		return rclient.Ping(ctx).Err()
 	}); err != nil {
 		log.Error("unable to connect to docker", sl.Err(err))
-		return
+		return nil, err
 	}
 
-	defer func() {
-		if err = pool.Purge(redisRes); err != nil {
-			log.Error("unable to purge redis resource", sl.Err(err))
-			return
-		}
-	}()
+	return redisRes, nil
+}
 
+// creates resource AND connects to postgres. pgxpool is available as global variable "pgpool"
+func initPostgres(ctx context.Context, cfg app.PostgresConfig) (*dockertest.Resource, error) {
 	pgRes, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
 		Tag:        "latest",
 		Env: []string{
-			"POSTGRES_PASSWORD=123",
-			"POSTGRES_USER=less",
-			"POSTGRES_DB=twitchclone",
+			fmt.Sprintf("POSTGRES_PASSWORD=%s", cfg.Password),
+			fmt.Sprintf("POSTGRES_USER=%s", cfg.User),
+			fmt.Sprintf("POSTGRES_DB=%s", cfg.Name),
 			"listen_addresses = '*'",
 		},
 	}, func(config *docker.HostConfig) {
@@ -91,27 +175,28 @@ func TestMain(m *testing.M) {
 	})
 	if err != nil {
 		log.Error("unable to start pg resource", sl.Err(err))
-		return
+		return nil, err
 	}
 
 	hostAndPort := pgRes.GetHostPort("5432/tcp")
-	databaseUrl := fmt.Sprintf("postgres://less:123@%s/twitchclone?sslmode=disable", hostAndPort)
-	log.Info("connection to databse on url", slog.String("url", databaseUrl))
-
-	// pgRes.Expire(30) // Tell docker to hard kill the container in 30 seconds
+	postgresConnURL := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable",
+		cfg.User,
+		cfg.Password,
+		hostAndPort,
+		cfg.Name)
+	// databaseUrl := fmt.Sprintf("postgres://less:123@%s/twitchclone?sslmode=disable", hostAndPort)
+	log.Info("connection to databse on url", slog.String("url", postgresConnURL))
 
 	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
-	pool.MaxWait = 3000 * time.Second
+	pool.MaxWait = 30 * time.Second
 	if err = pool.Retry(func() error {
-		pool, err := pgxpool.New(ctx, databaseUrl)
+		pool, err := pgxpool.New(ctx, postgresConnURL)
 		if err != nil {
-			log.Error("unable to create connection pool", sl.Err(err))
 			return err
 		}
 
 		conn, err := pool.Acquire(ctx)
 		if err != nil {
-			log.Error("unable to acquire connection", sl.Err(err))
 			return err
 		}
 		defer conn.Release()
@@ -121,43 +206,12 @@ func TestMain(m *testing.M) {
 		return nil
 	}); err != nil {
 		log.Error("unable to connect to docker", sl.Err(err))
-		return
+		return nil, err
 	}
 
-	defer func() {
-		if err := pool.Purge(pgRes); err != nil {
-			log.Error("unable to purge pg resource", sl.Err(err))
-			return
-		}
-	}()
+	return pgRes, nil
+}
 
-	// API_URL = "localhost:" + cfg.HTTP.Port
-
-	grpcClient, err := app.NewGRPClient(cfg.Log, cfg.Env, cfg.GRPC)
-	if err != nil {
-		log.Error("unable to purge pg resource", sl.Err(err))
-		return
-	}
-
-	srvcs := app.InitServices(ctx, cfg.Log,
-		cfg.InstanceID.String(),
-		cfg.Env,
-		cfg.Update.LivestreamsTimer,
-		grpcClient,
-		rclient,
-		pgpool)
-
-	setup.RecreateSchema(pgpool, rclient)
-	setup.Populate(ctx, pgpool,
-		srvcs.Auth,
-		srvcs.Livestream,
-		srvcs.Category,
-		srvcs.Follow,
-		srvcs.User)
-
-	handler := app.CreateHandler(ctx, cfg, srvcs)
-	ts = httptest.NewServer(handler)
-	defer ts.Close()
-
-	exitCode = m.Run()
+func initGRPC(env string, mock bool, cfg app.GrpcClientConfig) (auth.GRPCCLient, error) {
+	return app.NewGRPClient(log, env, mock, cfg)
 }

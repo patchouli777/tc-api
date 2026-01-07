@@ -1,4 +1,4 @@
-﻿.PHONY: up re fake local local-stop demo demo-stop swag test
+﻿.PHONY: up re fake local local-stop demo demo-stop swag test lint
 
 
 swag:
@@ -23,7 +23,7 @@ local:
 	docker run -d \
 	--name twc-backend-postgres \
 	-e POSTGRES_PASSWORD=123 \
-	-e POSTGRES_DB=twitchclone \
+	-e POSTGRES_DB=baklava \
 	-e POSTGRES_USER=cherry \
 	-p 5432:5432 \
 	-v /var/lib/postgresql \
@@ -33,8 +33,6 @@ local:
 	--name twc-backend-redis \
 	-p 6379:6379 \
 	--rm redis:latest
-
-	go run ./cmd/streamservermock
 
 
 local-stop:
@@ -46,7 +44,7 @@ demo:
 	docker run -d \
 	--name twc-backend-postgres \
 	-e POSTGRES_PASSWORD=123 \
-	-e POSTGRES_DB=twitchclone \
+	-e POSTGRES_DB=baklava \
 	-e POSTGRES_USER=cherry \
 	-p 5432:5432 \
 	-v /var/lib/postgresql \
@@ -67,8 +65,6 @@ demo:
 	-p 10080:10080/udp \
 	--rm ossrs/srs
 
-	go run ./cmd/streamservermock
-
 
 demo-stop:
 	docker stop twc-backend-postgres
@@ -78,3 +74,7 @@ demo-stop:
 
 test:
 	go test ./tests
+
+
+lint:
+	golangci-lint run

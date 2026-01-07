@@ -2,7 +2,6 @@ package category
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"main/internal/endpoint/livestream"
 	"main/internal/lib/sl"
@@ -10,47 +9,46 @@ import (
 	"time"
 )
 
-type LivestreamLister interface {
+type livestreamLister interface {
 	List(ctx context.Context, category string, page, count int) ([]livestream.Livestream, error)
 }
 
-type listerViewerUpdater interface {
+type listerUpdater interface {
 	Lister
 	ViewerUpdater
 }
 
 type CategoryUpdater struct {
-	lsr LivestreamLister
-	cr  listerViewerUpdater
-	log *slog.Logger
+	lsLister livestreamLister
+	lu       listerUpdater
+	log      *slog.Logger
 }
 
-func NewUpdater(log *slog.Logger, lsr LivestreamLister, cr Repository) *CategoryUpdater {
-	return &CategoryUpdater{lsr: lsr, cr: cr, log: log}
+func NewUpdater(log *slog.Logger, lsLister livestreamLister, lu listerUpdater) *CategoryUpdater {
+	return &CategoryUpdater{lsLister: lsLister, lu: lu, log: log}
 }
 
 func (cu *CategoryUpdater) Update(ctx context.Context, timeout time.Duration) {
+	const op = "category.Updater.Update"
+
 	go func() {
 		for {
 			timeoutCtx, cancelTimeout := context.WithCancel(ctx)
 
-			categories, err := cu.cr.List(timeoutCtx, CategoryFilter{
+			categories, err := cu.lu.List(timeoutCtx, CategoryFilter{
 				Page:  1,
 				Count: 10000,
 				Sort:  "desc",
 			})
 			if err != nil {
-				cu.log.Error("error getting categories while updating categories", sl.Err(err))
+				cu.log.Error("list categories", sl.Err(err), sl.Op(op))
 			}
 
 			for _, cat := range categories {
 				go func() {
-					lsArr, err := cu.lsr.List(timeoutCtx, cat.Link, 1, 99999)
+					lsArr, err := cu.lsLister.List(timeoutCtx, cat.Link, 1, 99999)
 					if err != nil {
-						cu.log.Error("error getting livestreams while updating categories", sl.Err(err), slog.Attr{
-							Key:   "category name",
-							Value: slog.StringValue(cat.Name),
-						})
+						cu.log.Error("list livestreams", sl.Err(err), sl.Op(op), slog.String("category", cat.Name))
 						return
 					}
 
@@ -62,17 +60,14 @@ func (cu *CategoryUpdater) Update(ctx context.Context, timeout time.Duration) {
 						viewers += lsArr[i].Viewers
 					}
 
-					err = cu.cr.UpdateViewersById(timeoutCtx, int(cat.Id), int(viewers))
+					err = cu.lu.UpdateViewersById(timeoutCtx, int(cat.Id), int(viewers))
 					if err != nil {
-						cu.log.Error("error updating category", sl.Err(err), slog.Attr{
-							Key:   "category name",
-							Value: slog.StringValue(cat.Name),
-						})
+						cu.log.Error("update viewers", sl.Err(err), sl.Op(op), slog.String("category", cat.Name))
 					}
 				}()
 			}
 
-			cu.log.Info(fmt.Sprintf("categories data updated. next in %s", timeout.String()))
+			cu.log.Info("category data updated", slog.String("next", timeout.String()))
 			select {
 			case <-ctx.Done():
 				cu.log.Info("category updating ended")

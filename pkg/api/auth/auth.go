@@ -20,7 +20,7 @@ func UserLogin(user User) (*TokenPair, error) {
 		fmt.Printf("unable to send request: %v\n", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint
 
 	refreshTokenCookie, err := resp.Request.Cookie("refreshToken")
 	if err != nil {

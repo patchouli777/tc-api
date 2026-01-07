@@ -3,10 +3,10 @@ package livestream
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"log/slog"
 	"main/internal/auth"
-	"main/internal/lib/er"
+	"main/internal/lib/handler"
 	l "main/pkg/api/livestream"
 	"net/http"
 	"strconv"
@@ -43,9 +43,12 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	streamer := r.PathValue("username")
 	ls, err := h.s.Get(r.Context(), streamer)
 	if err != nil {
-		// TODO: change internal error to not found everywhere
-		w.WriteHeader(http.StatusNotFound)
-		er.HandlerError(h.log, w, err, op, "resource not found")
+		if errors.Is(err, errNotFound) {
+			handler.Error(h.log, w, op, err, http.StatusNotFound, errNotFound.Error())
+			return
+		}
+
+		handler.Error(h.log, w, op, err, http.StatusNotFound, handler.MsgInternal)
 		return
 	}
 
@@ -90,9 +93,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	category := r.URL.Query().Get("category")
 	categoryId := r.URL.Query().Get("categoryId")
 	if categoryId == "" && category == "" {
-		const msg = "neither category nor category id is present"
-		er.HandlerError(h.log, w, fmt.Errorf("%s", msg), op, msg)
-		w.WriteHeader(http.StatusBadRequest)
+		handler.Error(h.log, w, op, errNoCategory, http.StatusBadRequest, errNoCategory.Error())
 		return
 	}
 
@@ -103,9 +104,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	pageInt, err := strconv.Atoi(page)
 	if err != nil {
-		const msg = "incorrect page"
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("%s", msg), op, msg)
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgBadPage)
 		return
 	}
 
@@ -116,9 +115,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	countInt, err := strconv.Atoi(count)
 	if err != nil {
-		const msg = "incorrect count"
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("%s", msg), op, msg)
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgBadCount)
 		return
 	}
 
@@ -129,8 +126,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		Count:      countInt,
 	})
 	if err != nil {
-		er.HandlerError(h.log, w, err, op, "internal error")
-		w.WriteHeader(http.StatusInternalServerError)
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -189,32 +185,34 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	username := r.PathValue("username")
 	ctx := r.Context()
-	user := ctx.Value(auth.AuthContextKey{})
-	usr := user.(*auth.Claims)
+	claims := ctx.Value(auth.AuthContextKey{})
+	user, ok := claims.(*auth.Claims)
 
-	if usr.Username != username {
-		const msg = "identity is not confirmed"
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("%s", msg), op, msg)
+	if !ok {
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
+		return
+	}
+
+	if user.Username != username {
+		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	var request l.PatchRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
+	// TODO: sentinel error
 	status, err := h.s.Update(r.Context(),
 		username, LivestreamUpdate{
 			Title:        request.Title,
 			CategoryLink: request.CategoryLink,
 		})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 

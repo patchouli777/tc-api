@@ -3,10 +3,9 @@ package follow
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"main/internal/auth"
-	"main/internal/lib/er"
+	"main/internal/lib/handler"
 	f "main/pkg/api/follow"
 	"net/http"
 )
@@ -44,26 +43,16 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	follower := r.PathValue("username")
 	ctx := r.Context()
-	// user := ctx.Value(auth.AuthContextKey{})
-	// usr := user.(*auth.Claims)
-
-	// if usr.Username != username {
-	// 	fmt.Println("Не удалось получить список фолловов: пользователь не тот, за кого себя выдает")
-	// 	http.Error(w, "Не удалось получить список фолловов: вы не тот, за кого себя выдаете", http.StatusBadRequest)
-	// 	return
-	// }
 
 	followed := r.URL.Query().Get("followed")
 	if followed == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("followed username is not present"), op, "followed username is not present")
+		handler.Error(h.log, w, op, errNoFollowed, http.StatusBadRequest, errNoFollowed.Error())
 		return
 	}
 
 	isFollower, err := h.s.IsFollower(ctx, follower, followed)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -84,15 +73,13 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} er.RequestError "Internal server error while retrieving follow list"
 // @Router /follows [get]
 func (h Handler) List(w http.ResponseWriter, r *http.Request) {
-	// TODO: update doc
 	const op = "getting follow list"
 
 	ctx := r.Context()
 	follower := r.URL.Query().Get("follower")
 
 	if follower == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("follower username is not present"), op, "follower username is not present")
+		handler.Error(h.log, w, op, errNoFollower, http.StatusBadRequest, errNoFollower.Error())
 		return
 	}
 
@@ -100,8 +87,7 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 	if extended == "true" {
 		extendedList, err := h.s.ListExtended(ctx, follower)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			er.HandlerError(h.log, w, err, op, "internal error")
+			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 			return
 		}
 
@@ -116,8 +102,7 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	followList, err := h.s.List(ctx, follower)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -148,11 +133,15 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("username")
 	ctx := r.Context()
 	claims := ctx.Value(auth.AuthContextKey{})
-	user := claims.(*auth.Claims)
+	user, ok := claims.(*auth.Claims)
+
+	if !ok {
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
+		return
+	}
 
 	if user.Username != username {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("identity is not confirmed"), op, "identity is not confirmed")
+		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
@@ -160,8 +149,7 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	err := h.s.Follow(ctx, username, following)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -185,20 +173,23 @@ func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	username := r.PathValue("username")
 	ctx := r.Context()
-	user := ctx.Value(auth.AuthContextKey{})
-	usr := user.(*auth.Claims)
+	claims := ctx.Value(auth.AuthContextKey{})
+	user, ok := claims.(*auth.Claims)
 
-	if usr.Username != username {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("identity is not confirmed"), op, "identity is not confirmed")
+	if !ok {
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
+		return
+	}
+
+	if user.Username != username {
+		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	unfollowing := r.URL.Query().Get("unfollowing")
 	err := h.s.Unfollow(ctx, username, unfollowing)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 

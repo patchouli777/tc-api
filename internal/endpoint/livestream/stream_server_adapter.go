@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"main/internal/lib/sl"
 	"main/pkg/api/streamserver"
+	"main/pkg/util"
 	"math/rand"
 	"net/http"
 	"os"
@@ -46,20 +47,20 @@ func (u *StreamServerAdapter) List(ctx context.Context) (*streamserver.ListRespo
 	cl := &http.Client{}
 	response, err := cl.Get(u.endpoint)
 	if err != nil {
-		u.log.Error("unable to get livestreams from server", sl.Err(err), slog.String("op", op))
+		u.log.Error("get livestreams", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer response.Body.Close() // nolint
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		u.log.Error("unable to read response from streaming server", sl.Err(err), slog.String("op", op))
+		u.log.Error("parse response", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 
 	var resp streamserver.ListResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		u.log.Error("unable to unmarshal response from streaming server", sl.Err(err), slog.String("op", op))
+		u.log.Error("unmarshal response", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 
@@ -72,20 +73,20 @@ func (u *StreamServerAdapter) Get(ctx context.Context, channel string) (*streams
 	cl := &http.Client{}
 	response, err := cl.Get(u.endpoint)
 	if err != nil {
-		u.log.Error("unable to get livestream from server", sl.Err(err), slog.String("channel", channel), slog.String("op", op))
+		u.log.Error("get livestream", sl.Err(err), sl.Op(op), slog.String("channel", channel))
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer response.Body.Close() // nolint
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		u.log.Error("unable to read response from streaming server", sl.Err(err), slog.String("op", op))
+		u.log.Error("parse response", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 
 	var resp streamserver.GetResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		u.log.Error("unable to unmarshal response from streaming server", sl.Err(err), slog.String("op", op))
+		u.log.Error("unmarshal response", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 
@@ -102,7 +103,8 @@ func (u *StreamServerAdapter) Update(ctx context.Context, timeout time.Duration)
 				return
 			}
 
-			entries, err := os.ReadDir("./static/livestreamthumbs")
+			root := util.GetProjectRoot()
+			entries, err := os.ReadDir(root + "/static/livestreamthumbs")
 			if err != nil {
 				u.log.Error("Unable to read ./static/livestreamthumbs. Cancelling updates for livestreams.", sl.Err(err))
 				return
@@ -119,6 +121,12 @@ func (u *StreamServerAdapter) Update(ctx context.Context, timeout time.Duration)
 				})
 				if err != nil {
 					u.log.Error("error", sl.Err(err), slog.String("user", st.Name))
+
+					// if err != nil {
+					// 	fmt.Println("--------------------------------")
+					// 	fmt.Printf("err %v\n", err)
+					// 	fmt.Println("--------------------------------")
+					// }
 				}
 
 				thumbnailId := rand.Intn(len(entries))

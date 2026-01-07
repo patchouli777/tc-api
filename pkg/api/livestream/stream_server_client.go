@@ -33,7 +33,7 @@ func (c *StreamServerClient) Start(username string) (*http.Response, error) {
 		c.base.Log.Error("unable to create post request", sl.Err(err))
 		return nil, err
 	}
-	defer req.Body.Close()
+	defer req.Body.Close() // nolint
 
 	return c.base.Client.Do(req)
 }
@@ -44,7 +44,7 @@ func (c *StreamServerClient) Stop(username string) (*http.Response, error) {
 		c.base.Log.Error("unable to create delete request", sl.Err(err))
 		return nil, err
 	}
-	defer req.Body.Close()
+	defer req.Body.Close() // nolint
 
 	return c.base.Client.Do(req)
 }

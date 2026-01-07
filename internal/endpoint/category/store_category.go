@@ -2,6 +2,7 @@ package category
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -21,7 +22,15 @@ func (r *categoryStore) add(ctx context.Context, cat Category) error {
 func (r *categoryStore) get(ctx context.Context, id string) (*Category, error) {
 	var category Category
 	err := r.rdb.HGetAll(ctx, r.key(id)).Scan(&category)
-	return &category, err
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, errNotFound
+		}
+
+		return nil, err
+	}
+
+	return &category, nil
 }
 
 func (r *categoryStore) list(ctx context.Context, ids []string) ([]Category, error) {
@@ -33,6 +42,7 @@ func (r *categoryStore) list(ctx context.Context, ids []string) ([]Category, err
 	}
 
 	_, err := pipe.Exec(ctx)
+	// TODO: why != redis.Nil?
 	if err != nil && err != redis.Nil {
 		return nil, err
 	}

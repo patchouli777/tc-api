@@ -28,8 +28,6 @@ func NewGRPClient(
 	timeout time.Duration,
 	retriesCount int,
 ) (*GRPCClientImpl, error) {
-	const op = "grpc.New"
-
 	retryOpts := []grpcretry.CallOption{
 		grpcretry.WithCodes(codes.NotFound, codes.Aborted, codes.DeadlineExceeded),
 		grpcretry.WithMax(uint(retriesCount)),

@@ -27,6 +27,7 @@ func (r *RepositoryImpl) Get(ctx context.Context, username string) (*User, error
 	queries := db.New(conn)
 	q := NewDBAdapter(queries)
 
+	// TODO: sentinel
 	res, err := q.SelectByUsername(ctx, username)
 	if err != nil {
 		return nil, err
@@ -58,6 +59,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, u UserCreate) error {
 	return err
 }
 
+// TODO: impl
 func (r *RepositoryImpl) Update(ctx context.Context, u UserUpdate) error {
 	conn, err := r.pool.Acquire(ctx)
 	if err != nil {

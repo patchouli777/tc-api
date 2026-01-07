@@ -55,10 +55,8 @@ func addRoutes(mux *http.ServeMux,
 	apiMux.HandleFunc("DELETE /categories/{categoryIdentifier}", authMiddleware(log, categoriesHandler.Delete))
 
 	authHandler := auth.NewHandler(log, as)
-	apiMux.HandleFunc("POST /auth/login", authHandler.Login)
-	apiMux.HandleFunc("POST /auth/register", authHandler.Register)
-	// apiMux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
-	// apiMux.HandleFunc("POST /auth/logout", authHandler.Logout)
+	apiMux.HandleFunc("POST /auth/signin", authHandler.SignIn)
+	apiMux.HandleFunc("POST /auth/signup", authHandler.SignUp)
 
 	followHandler := follow.NewHandler(log, fs)
 	apiMux.HandleFunc("GET /follow", followHandler.List)

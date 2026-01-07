@@ -1,4 +1,4 @@
-package main
+package streamservermock
 
 type livestream struct {
 	channel string

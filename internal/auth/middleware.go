@@ -2,9 +2,9 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"log/slog"
-	"main/internal/lib/er"
+	"main/internal/lib/handler"
 	"net/http"
 	"strings"
 
@@ -12,13 +12,13 @@ import (
 )
 
 func AuthMiddleware(log *slog.Logger, next http.HandlerFunc) http.HandlerFunc {
-	const op = "auth.middleware"
+	const op = "auth middleware"
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(er.RequestError{Error: "missing Authorization header"})
+			handler.Error(log, w, op, fmt.Errorf("missing Authorization header"),
+				http.StatusUnauthorized, "missing Authorization header")
 			return
 		}
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
@@ -29,8 +29,7 @@ func AuthMiddleware(log *slog.Logger, next http.HandlerFunc) http.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			w.WriteHeader(http.StatusUnauthorized)
-			er.HandlerError(log, w, err, op, "invalid or expired token")
+			handler.Error(log, w, op, err, http.StatusUnauthorized, "invalid or expired token")
 			return
 		}
 

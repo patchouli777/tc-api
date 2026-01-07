@@ -50,7 +50,7 @@ services:
       POSTGRES_USER: less
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_NAME: twitchclone
+      POSTGRES_DB: baklava
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       REDIS_HOST: redis
       REDIS_PORT: 6379

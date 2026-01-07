@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"main/internal/lib/er"
+	"main/internal/lib/handler"
+	"main/internal/lib/sl"
 	"net/http"
 	"time"
 )
 
 type Service interface {
-	Login(ctx context.Context, username, password string) (*TokenPair, error)
-	Register(ctx context.Context, email, username, password string) (*TokenPair, error)
+	SignIn(ctx context.Context, username, password string) (*TokenPair, error)
+	SignUp(ctx context.Context, email, username, password string) (*TokenPair, error)
 }
 
 type Handler struct {
@@ -24,38 +25,27 @@ func NewHandler(log *slog.Logger, s Service) *Handler {
 	return &Handler{log: log, as: s}
 }
 
-// Login godoc
-// @Summary      User login
-// @Description  Authenticate user and return access token (refresh token set as cookie)
-// @Tags         auth
-// @Accept       json
-// @Produce      json
-// @Param        request  body    LoginRequest  true  "Login credentials"
-// @Success      200  {object}  LoginResponse  "Access token returned"
-// @Failure      400  {string}  string  "Invalid credentials or request data"
-// @Failure      500  {string}  string  "Internal server error"
-// @Router       /login [post]
-func (h Handler) Login(w http.ResponseWriter, r *http.Request) {
-	const op = "logging in"
+// TODO: update doc
+func (h Handler) SignIn(w http.ResponseWriter, r *http.Request) {
+	const op = "signing in"
 
 	var request LoginRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
-	tokenPair, err := h.as.Login(r.Context(), request.Username, request.Password)
+	tokenPair, err := h.as.SignIn(r.Context(), request.Username, request.Password)
 	if err != nil {
-		if errors.Is(err, ErrWrongCredentials) {
-			w.WriteHeader(http.StatusBadRequest)
-			er.HandlerError(h.log, w, err, op, "wrong credentials")
+		h.log.Error(op, sl.Err(err))
+
+		if errors.Is(err, errWrongCredentials) {
+			handler.Error(h.log, w, op, err, http.StatusBadRequest, errWrongCredentials.Error())
 			return
 		}
 
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -65,39 +55,27 @@ func (h Handler) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(LoginResponse{Access: string(tokenPair.Access)})
 }
 
-// Register godoc
-// @Summary      User registration
-// @Description  Register new user account and return access token (refresh token set as cookie)
-// @Tags         auth
-// @Accept       json
-// @Produce      json
-// @Param        request  body    RegisterRequest  true  "Registration data"
-// @Success      200  {object}  RegisterResponse  "Access token returned"
-// @Failure      400  {string}  string  "Invalid request data"
-// @Failure      409  {string}  string  "User already exists"
-// @Failure      500  {string}  string  "Internal server error"
-// @Router       /register [post]
-func (h Handler) Register(w http.ResponseWriter, r *http.Request) {
-	const op = "register"
+// TODO: update doc
+func (h Handler) SignUp(w http.ResponseWriter, r *http.Request) {
+	const op = "signing up"
 
 	var request RegisterRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
-	tokenPair, err := h.as.Register(r.Context(), request.Email, request.Username, request.Password)
+	tokenPair, err := h.as.SignUp(r.Context(), request.Email, request.Username, request.Password)
 	if err != nil {
-		if errors.Is(err, ErrUserAlreadyExists) {
-			w.WriteHeader(http.StatusConflict)
-			er.HandlerError(h.log, w, err, op, "user already exists")
+		h.log.Error(op, sl.Err(err))
+
+		if errors.Is(err, errUserAlreadyExists) {
+			handler.Error(h.log, w, op, err, http.StatusConflict, errUserAlreadyExists.Error())
 			return
 		}
 
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 

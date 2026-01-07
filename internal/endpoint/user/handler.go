@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"main/internal/auth"
-	"main/internal/lib/er"
+	"main/internal/lib/handler"
 	u "main/pkg/api/user"
 	"net/http"
 )
@@ -47,8 +46,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.s.Get(r.Context(), username)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -87,20 +85,17 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	var req u.PostRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
 	if req.Name == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("username required"), op, "username required")
+		handler.Error(h.log, w, op, errUsernameRequired, http.StatusBadRequest, errUsernameRequired.Error())
 		return
 	}
 
 	if req.Password == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("password required"), op, "password required")
+		handler.Error(h.log, w, op, errPasswordRequired, http.StatusBadRequest, errPasswordRequired.Error())
 		return
 	}
 
@@ -114,20 +109,17 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		Password: *req.Password,
 		Avatar:   av,
 	})); err != nil {
-		if errors.Is(err, ErrUserExists) {
-			w.WriteHeader(http.StatusConflict)
-			er.HandlerError(h.log, w, err, op, "username is taken")
+		if errors.Is(err, errUserExists) {
+			handler.Error(h.log, w, op, err, http.StatusConflict, errUserExists.Error())
 			return
 		}
 
-		if errors.Is(err, ErrWeakPassword) {
-			w.WriteHeader(http.StatusBadRequest)
-			er.HandlerError(h.log, w, err, op, "password is too weak")
+		if errors.Is(err, errWeakPassword) {
+			handler.Error(h.log, w, op, err, http.StatusBadRequest, errWeakPassword.Error())
 			return
 		}
 
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -155,24 +147,20 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	claims := ctx.Value(auth.AuthContextKey{})
-	// TODO: добавить везде ok
 	user, ok := claims.(*auth.Claims)
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("error casting claims"), op, "internal error")
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	if user.Username != username {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("identity is not confirmed"), op, "identity is not confirmed")
+		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	var req u.PatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
@@ -183,20 +171,17 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		IsBanned:  req.IsBanned,
 		IsPartner: req.IsPartner,
 	}); err != nil {
-		if errors.Is(err, ErrUserExists) {
-			w.WriteHeader(http.StatusConflict)
-			er.HandlerError(h.log, w, err, op, "username is taken")
+		if errors.Is(err, errUserExists) {
+			handler.Error(h.log, w, op, err, http.StatusConflict, errUserExists.Error())
 			return
 		}
 
-		if errors.Is(err, ErrWeakPassword) {
-			w.WriteHeader(http.StatusBadRequest)
-			er.HandlerError(h.log, w, err, op, "password is too weak")
+		if errors.Is(err, errWeakPassword) {
+			handler.Error(h.log, w, op, err, http.StatusBadRequest, errWeakPassword.Error())
 			return
 		}
 
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -226,27 +211,23 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	// TODO: добавить везде ok
 	user, ok := claims.(*auth.Claims)
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("error casting claims"), op, "internal error")
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	if user.Username != username {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("identity is not confirmed"), op, "identity is not confirmed")
+		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	var req u.DeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
 	if err := h.s.Delete(ctx, req.UserId); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
@@ -272,29 +253,24 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	claims := ctx.Value(auth.AuthContextKey{})
 	user, ok := claims.(*auth.Claims)
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("error casting claims"), op, "internal error")
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	if user.Role != "staff" {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, fmt.Errorf("you are not allowed to perform this action"),
-			op, "you are not allowed to perform this action")
+		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
 	var req u.ListRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		er.HandlerError(h.log, w, err, op, "invalid data in the request")
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
 	users, err := h.s.List(ctx, UserList(req))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		er.HandlerError(h.log, w, err, op, "internal error")
+		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 

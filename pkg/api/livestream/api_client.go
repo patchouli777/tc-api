@@ -5,7 +5,6 @@ import (
 	"main/internal/lib/sl"
 	"main/pkg/client"
 	"net/http"
-	"os"
 )
 
 type LivestreamClient struct {
@@ -13,18 +12,14 @@ type LivestreamClient struct {
 	BaseURL string
 }
 
-func NewClient() *LivestreamClient {
+func NewLivestreamClient(log *slog.Logger) *LivestreamClient {
 	return &LivestreamClient{
 		base: &client.BaseClient{
-			Log:    slog.New(slog.NewTextHandler(os.Stdout, nil)),
+			Log:    log,
 			Client: &http.Client{},
 		},
-		BaseURL: "localhost:8090/livestreams/"}
+		BaseURL: "http://localhost:8090/api/livestreams"}
 }
-
-// func (c *LivestreamClient) Delete(channel string) (*http.Response, error) {return nil, errors.New("not implemented")}
-
-// func (c *LivestreamClient) Post(channel string) (*http.Response, error) {return nil, errors.New("not implemented")}
 
 func (c *LivestreamClient) Get(channel string) (*http.Response, error) {
 	r := GetRequest{Channel: channel}
@@ -34,7 +29,7 @@ func (c *LivestreamClient) Get(channel string) (*http.Response, error) {
 		c.base.Log.Error("unable to create presence request", sl.Err(err))
 		return nil, err
 	}
-	defer req.Body.Close()
+	defer req.Body.Close() // nolint
 
 	return c.base.Client.Do(req)
 }
@@ -45,7 +40,7 @@ func (c *LivestreamClient) List() (*http.Response, error) {
 		c.base.Log.Error("unable to create list request", sl.Err(err))
 		return nil, err
 	}
-	defer req.Body.Close()
+	defer req.Body.Close() // nolint
 
 	return c.base.Client.Do(req)
 }
@@ -58,7 +53,7 @@ func (c *LivestreamClient) Patch(username, title, link string) (*http.Response, 
 		c.base.Log.Error("unable to create list request", sl.Err(err))
 		return nil, err
 	}
-	defer req.Body.Close()
+	defer req.Body.Close() // nolint
 
 	return c.base.Client.Do(req)
 }

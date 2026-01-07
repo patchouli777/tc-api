@@ -2,9 +2,8 @@ package follow
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 	"main/internal/db"
-	"main/internal/lib/sl"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,20 +11,16 @@ import (
 
 // TODO: idempotency
 type ServiceImpl struct {
-	log  *slog.Logger
 	pool *pgxpool.Pool
 }
 
-func NewService(log *slog.Logger, pool *pgxpool.Pool) *ServiceImpl {
-	return &ServiceImpl{log: log, pool: pool}
+func NewService(pool *pgxpool.Pool) *ServiceImpl {
+	return &ServiceImpl{pool: pool}
 }
 
 func (s ServiceImpl) IsFollower(ctx context.Context, follower, followed string) (bool, error) {
-	const op = "follow.Service.IsFollower"
-
 	conn, err := s.pool.Acquire(ctx)
 	if err != nil {
-		s.log.Error("failed to acquire connection", sl.Str("op", op))
 		return false, err
 	}
 	defer conn.Release()
@@ -36,19 +31,15 @@ func (s ServiceImpl) IsFollower(ctx context.Context, follower, followed string) 
 		Name_2: followed,
 	})
 	if err != nil {
-		s.log.Error("failed to determine whether user is follower", sl.Str("op", op))
-		return false, err
+		return false, fmt.Errorf("failed to determine whether user is follower. %w", err)
 	}
 
 	return true, nil
 }
 
 func (s ServiceImpl) List(ctx context.Context, follower string) ([]FollowerListItem, error) {
-	const op = "follow.Service.List"
-
 	conn, err := s.pool.Acquire(ctx)
 	if err != nil {
-		s.log.Error("failed to acquire connection", sl.Str("op", op))
 		return nil, err
 	}
 	defer conn.Release()
@@ -56,8 +47,7 @@ func (s ServiceImpl) List(ctx context.Context, follower string) ([]FollowerListI
 	q := QueriesAdapter{queries: db.New(conn)}
 	list, err := q.SelectMany(ctx, follower)
 	if err != nil {
-		s.log.Error("failed to get following list", sl.Str("op", op))
-		return nil, err
+		return nil, fmt.Errorf("failed to get following list. %w", err)
 	}
 
 	following := make([]FollowerListItem, len(list))
@@ -72,11 +62,8 @@ func (s ServiceImpl) List(ctx context.Context, follower string) ([]FollowerListI
 }
 
 func (s ServiceImpl) ListExtended(ctx context.Context, follower string) ([]FollowingListExtendedItem, error) {
-	const op = "follow.Service.ListExtended"
-
 	conn, err := s.pool.Acquire(ctx)
 	if err != nil {
-		s.log.Error("failed to acquire connection", sl.Str("op", op))
 		return nil, err
 	}
 	defer conn.Release()
@@ -84,8 +71,7 @@ func (s ServiceImpl) ListExtended(ctx context.Context, follower string) ([]Follo
 	q := QueriesAdapter{queries: db.New(conn)}
 	list, err := q.SelectManyExtended(ctx, follower)
 	if err != nil {
-		s.log.Error("failed to get extended following list", sl.Str("op", op))
-		return nil, err
+		return nil, fmt.Errorf("failed to get extended following list. %w", err)
 	}
 
 	following := make([]FollowingListExtendedItem, len(list))
@@ -104,11 +90,8 @@ func (s ServiceImpl) ListExtended(ctx context.Context, follower string) ([]Follo
 }
 
 func (s ServiceImpl) Follow(ctx context.Context, follower, followed string) error {
-	const op = "follow.Service.Follow"
-
 	conn, err := s.pool.Acquire(ctx)
 	if err != nil {
-		s.log.Error("failed to acquire connection", sl.Str("op", op))
 		return err
 	}
 	defer conn.Release()
@@ -119,19 +102,15 @@ func (s ServiceImpl) Follow(ctx context.Context, follower, followed string) erro
 		Column2: pgtype.Text{String: followed, Valid: true},
 	})
 	if err != nil {
-		s.log.Error("failed to follow", sl.Str("op", op))
-		return err
+		return fmt.Errorf("failed to follow. %w", err)
 	}
 
 	return nil
 }
 
 func (s ServiceImpl) Unfollow(ctx context.Context, unfollower, unfollowed string) error {
-	const op = "follow.Service.Unfollow"
-
 	conn, err := s.pool.Acquire(ctx)
 	if err != nil {
-		s.log.Error("failed to acquire connection", sl.Str("op", op))
 		return err
 	}
 	defer conn.Release()
@@ -142,8 +121,7 @@ func (s ServiceImpl) Unfollow(ctx context.Context, unfollower, unfollowed string
 		Name_2: unfollowed,
 	})
 	if err != nil {
-		s.log.Error("failed to unfollow", sl.Str("op", op))
-		return err
+		return fmt.Errorf("failed to unfollow. %w", err)
 	}
 
 	return nil

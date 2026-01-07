@@ -3,9 +3,8 @@ package setup
 import (
 	"context"
 	"log"
+	"main/pkg/util"
 	"os"
-	"path/filepath"
-	"runtime"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -18,7 +17,7 @@ func RecreateSchema(pool *pgxpool.Pool, rdb *redis.Client) {
 		log.Fatalf("unable to acquire connection: %v", err)
 	}
 
-	root := getProjectRoot()
+	root := util.GetProjectRoot()
 
 	b, err := os.ReadFile(root + "\\internal\\db\\scripts\\remove_all.sql")
 	if err != nil {
@@ -53,19 +52,4 @@ func RecreateSchema(pool *pgxpool.Pool, rdb *redis.Client) {
 		log.Fatalf("unable to create schema: %v", err)
 	}
 	log.Println("schema created")
-}
-
-func getProjectRoot() string {
-	_, filename, _, _ := runtime.Caller(0)
-	dir := filepath.Dir(filename)
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir { // Root reached
-			return ""
-		}
-		dir = parent
-	}
 }

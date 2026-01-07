@@ -3,6 +3,7 @@ package livestream
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"main/internal/lib/sl"
@@ -63,12 +64,17 @@ func (r *livestreamStore) List(ctx context.Context, ids []string) ([]Livestream,
 }
 
 func (r *livestreamStore) Get(ctx context.Context, lsId string) (*Livestream, error) {
-	re, err := r.rdb.HGetAll(ctx, r.Key(lsId)).Result()
+	res, err := r.rdb.HGetAll(ctx, r.Key(lsId)).Result()
+
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, errNotFound
+		}
+
 		return nil, err
 	}
 
-	return r.deserealize(re)
+	return r.deserealize(res)
 }
 
 func (r *livestreamStore) UpdateViewers(ctx context.Context, lsId string, viewers int) error {

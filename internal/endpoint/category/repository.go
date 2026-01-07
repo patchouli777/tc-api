@@ -13,13 +13,17 @@ import (
 )
 
 type RepositoryImpl struct {
-	rdb        *redis.Client
-	pool       *pgxpool.Pool
-	sorted     sortedStore
+	rdb  *redis.Client
+	pool *pgxpool.Pool
+	// ids of categories sorted by viewers
+	sorted sortedStore
+	// categories objects
 	categories categoryStore
-	linkMap    linkMap
+	// map from category link to id
+	linkMap linkMap
 }
 
+// TODO: properly handle errors (not found, duplicate, etc)
 func NewRepo(rdb *redis.Client, pool *pgxpool.Pool) *RepositoryImpl {
 	sorted := sortedStore{rdb: rdb}
 	categories := categoryStore{rdb: rdb}
@@ -65,7 +69,7 @@ func (r *RepositoryImpl) List(ctx context.Context, f CategoryFilter) ([]Category
 
 	ids, err := r.sorted.get(ctx, start, count)
 	if err != nil {
-		return nil, fmt.Errorf("error getting list of categories: %v", err)
+		return nil, fmt.Errorf("error getting list of categories: %w", err)
 	}
 
 	categories, err := r.categories.list(ctx, ids)
@@ -80,7 +84,7 @@ func (r *RepositoryImpl) List(ctx context.Context, f CategoryFilter) ([]Category
 func (r *RepositoryImpl) Create(ctx context.Context, cat CategoryCreate) error {
 	conn, err := r.pool.Acquire(ctx)
 	if err != nil {
-		return fmt.Errorf("error acquiring connection: %v", err)
+		return fmt.Errorf("error acquiring connection: %w", err)
 	}
 	defer conn.Release()
 
@@ -92,10 +96,10 @@ func (r *RepositoryImpl) Create(ctx context.Context, cat CategoryCreate) error {
 	})
 	if err != nil {
 		if errors.Is(err, db.ErrDuplicateKey) {
-			return ErrCategoryAlreadyExists
+			return errAlreadyExists
 		}
 
-		return fmt.Errorf("error creating category: %v", err)
+		return fmt.Errorf("error creating category: %w", err)
 	}
 
 	category := Category{

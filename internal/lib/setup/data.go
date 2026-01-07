@@ -3,6 +3,7 @@ package setup
 import (
 	"fmt"
 	"log"
+	"main/pkg/util"
 	"math"
 	"math/rand/v2"
 	"os"
@@ -97,7 +98,7 @@ type setupUser struct {
 }
 
 func usersGet(count int) []setupUser {
-	root := getProjectRoot()
+	root := util.GetProjectRoot()
 
 	entries, err := os.ReadDir(root + "/static/avatars")
 	if err != nil {

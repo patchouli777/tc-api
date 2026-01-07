@@ -3,10 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log/slog"
 	"main/internal/db"
-	"main/internal/lib/sl"
 )
 
 // TODO: refresh, access unused
@@ -17,27 +14,23 @@ type GRPCCLient interface {
 }
 
 type ServiceImpl struct {
-	log     *slog.Logger
-	adapter *QueriesAdapter
+	queries *QueriesAdapter
 	grpc    GRPCCLient
 }
 
-func NewService(log *slog.Logger, grpc GRPCCLient, adapter *QueriesAdapter) *ServiceImpl {
-	return &ServiceImpl{log: log, grpc: grpc, adapter: adapter}
+func NewService(grpc GRPCCLient, adapter *QueriesAdapter) *ServiceImpl {
+	return &ServiceImpl{grpc: grpc, queries: adapter}
 }
 
-func (s *ServiceImpl) Login(ctx context.Context, username, password string) (*TokenPair, error) {
-	const op = "auth.ServiceImpl.Login"
-
-	ui, err := s.adapter.Select(ctx, db.AuthSelectUserParams{Name: username, Password: password})
+// TODO: grpc client stuff
+func (s *ServiceImpl) SignIn(ctx context.Context, username, password string) (*TokenPair, error) {
+	ui, err := s.queries.Select(ctx, db.AuthSelectUserParams{Name: username, Password: password})
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
-			s.log.Error("error finding user", sl.Err(err))
-			return nil, ErrWrongCredentials
+			return nil, errWrongCredentials
 		}
 
-		s.log.Error("error finding user", sl.Err(err))
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, err
 	}
 
 	pair, err := s.grpc.GetPair(ctx, UserInfo{Id: ui.ID, Username: username, Role: string(ui.AppRole)})
@@ -48,14 +41,13 @@ func (s *ServiceImpl) Login(ctx context.Context, username, password string) (*To
 	return pair, nil
 }
 
-func (s *ServiceImpl) Register(ctx context.Context, email, username, password string) (*TokenPair, error) {
-	err := s.adapter.Insert(ctx, db.AuthInsertUserParams{Name: username, Password: password})
+func (s *ServiceImpl) SignUp(ctx context.Context, email, username, password string) (*TokenPair, error) {
+	err := s.queries.Insert(ctx, db.AuthInsertUserParams{Name: username, Password: password})
 	if err != nil {
 		if errors.Is(err, db.ErrDuplicateKey) {
-			return nil, ErrUserAlreadyExists
+			return nil, errUserAlreadyExists
 		}
 
-		s.log.Error("error register", sl.Err(err))
 		return nil, err
 	}
 

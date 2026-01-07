@@ -14,7 +14,6 @@ import (
 	"main/internal/lib/sl"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -51,16 +50,15 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 		return nil
 	}
 
-	srvcs := InitServices(ctx,
+	srvcs := InitApp(ctx,
 		log,
 		cfg.InstanceID.String(),
 		cfg.Env,
-		cfg.StreamServiceMock,
-		cfg.Update.LivestreamsTimeout,
-		cfg.Update.CategoriesTimeout,
 		grpcClient,
 		rdb,
 		pool)
+	srvcs.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
+	srvcs.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
 
 	handler := CreateHandler(ctx, log, cfg, srvcs)
 
@@ -74,7 +72,7 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 	return server
 }
 
-func CreateHandler(ctx context.Context, log *slog.Logger, cfg Config, srvcs Services) http.Handler {
+func CreateHandler(ctx context.Context, log *slog.Logger, cfg Config, srvcs App) http.Handler {
 	mux := http.NewServeMux()
 	addRoutes(mux, log,
 		srvcs.Category,
@@ -84,57 +82,56 @@ func CreateHandler(ctx context.Context, log *slog.Logger, cfg Config, srvcs Serv
 		srvcs.Follow,
 		srvcs.User)
 
-	return mw.PanicRecovery(mw.JSONResponse(mw.CORS(mw.Logging(mux))))
+	panicRecovery := mw.PanicRecovery(log)
+	logging := mw.Logging(ctx, log)
+	return panicRecovery(mw.JSONResponse(mw.CORS(logging(mux))))
 }
 
-type Services struct {
-	Auth       *auth.ServiceImpl
-	Livestream *livestream.ServiceImpl
-	SSAdapter  *livestream.StreamServerAdapter
-	Category   *category.RepositoryImpl
-	Follow     *follow.ServiceImpl
-	User       *user.ServiceImpl
-	Channel    *channel.ServiceImpl
+type App struct {
+	Auth                *auth.ServiceImpl
+	Livestream          *livestream.ServiceImpl
+	StreamServerAdapter *livestream.StreamServerAdapter
+	Category            *category.RepositoryImpl
+	CategoryUpdater     *category.CategoryUpdater
+	Follow              *follow.ServiceImpl
+	User                *user.ServiceImpl
+	Channel             *channel.ServiceImpl
 }
 
-func InitServices(ctx context.Context,
+func InitApp(ctx context.Context,
 	log *slog.Logger,
 	instanceID string,
 	env string,
-	streamServiceMock bool,
-	lsUpdateTimeout time.Duration,
-	catUpdateTimeout time.Duration,
 	grpcClient auth.GRPCCLient,
 	rdb *redis.Client,
-	pool *pgxpool.Pool) Services {
+	pool *pgxpool.Pool) App {
 	livestreamRepo := livestream.NewRepo(rdb, pool)
 	streamServerAdapter := livestream.NewStreamServerAdapter(log, livestreamRepo, instanceID)
-	livestreamsService := livestream.NewService(log, livestreamRepo)
-	streamServerAdapter.Update(ctx, lsUpdateTimeout)
+	livestreamsService := livestream.NewService(livestreamRepo)
 
 	channelDBAdapter := channel.NewAdapter(pool)
 	channelService := channel.NewService(log, channelDBAdapter)
 
 	categoryRepo := category.NewRepo(rdb, pool)
 	categoryUpdater := category.NewUpdater(log, livestreamRepo, categoryRepo)
-	categoryUpdater.Update(ctx, catUpdateTimeout)
 
 	authDBAdapter := auth.NewAdapter(pool)
-	authService := auth.NewService(log, grpcClient, authDBAdapter)
+	authService := auth.NewService(grpcClient, authDBAdapter)
 
-	followService := follow.NewService(log, pool)
+	followService := follow.NewService(pool)
 
 	userRepo := user.NewRepository(pool)
-	userService := user.NewService(log, userRepo)
+	userService := user.NewService(userRepo)
 
-	return Services{
-		Auth:       authService,
-		Livestream: livestreamsService,
-		Channel:    channelService,
-		Category:   categoryRepo,
-		Follow:     followService,
-		User:       userService,
-		SSAdapter:  streamServerAdapter}
+	return App{
+		Auth:                authService,
+		Livestream:          livestreamsService,
+		Channel:             channelService,
+		Category:            categoryRepo,
+		CategoryUpdater:     categoryUpdater,
+		Follow:              followService,
+		User:                userService,
+		StreamServerAdapter: streamServerAdapter}
 }
 
 func NewGRPClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfig) (auth.GRPCCLient, error) {
