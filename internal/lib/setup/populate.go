@@ -11,7 +11,7 @@ import (
 	"main/internal/endpoint/follow"
 	"main/internal/endpoint/livestream"
 	"main/internal/endpoint/user"
-	livestreamApi "main/pkg/api/livestream"
+	livestreamApi "main/pkg/api/model/livestream"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -41,8 +41,7 @@ func addCategories(ctx context.Context, cr *category.RepositoryImpl) {
 			Thumbnail: cat.Thumbnail,
 			Name:      cat.Name,
 			Link:      cat.Link,
-			Viewers:   0,
-			// Tags:      []string{"tag1", "tag2"},
+			Tags:      []int32{1, 2},
 		})
 
 		if err != nil {
@@ -64,6 +63,7 @@ func addUsers(ctx context.Context, pool *pgxpool.Pool) {
 
 	r, err := conn.Query(ctx, usersToSQL(users))
 	if err != nil {
+		fmt.Println(usersToSQL(users))
 		log.Fatalf("unable to add users: %v", err)
 	}
 	r.Close()
@@ -117,7 +117,6 @@ func addFollows(ctx context.Context, fs *follow.ServiceImpl) {
 	slog.Info("follows added")
 }
 
-// TODO: batch insert in user repo/service???
 func usersToSQL(users []setupUser) string {
 	var sql bytes.Buffer
 	sql.WriteString(`INSERT INTO tc_user(name, password, avatar, description, links, tags) VALUES `)

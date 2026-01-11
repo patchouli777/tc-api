@@ -90,28 +90,20 @@ func TestMain(m *testing.M) {
 		pgpool)
 
 	setup.RecreateSchema(pgpool, rclient)
-	setup.Populate(ctx, pgpool,
-		srvcs.Auth,
-		srvcs.StreamServerAdapter,
-		srvcs.Category,
-		srvcs.Follow,
-		srvcs.User)
-	srvcs.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
-	srvcs.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
+	// setup.Populate(ctx, pgpool,
+	// 	srvcs.Auth,
+	// 	srvcs.StreamServerAdapter,
+	// 	srvcs.Category,
+	// 	srvcs.Follow,
+	// 	srvcs.User)
+	// srvcs.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
+	// srvcs.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
 
 	handler := app.CreateHandler(ctx, log, cfg, srvcs)
 	ts = httptest.NewServer(handler)
 	defer ts.Close()
 
 	m.Run()
-
-	// if err := pool.Purge(redisRes); err != nil {
-	// 	log.Error("unable to purge redis resource", sl.Err(err))
-	// }
-
-	// if err := pool.Purge(pgRes); err != nil {
-	// 	log.Error("unable to purge pg resource", sl.Err(err))
-	// }
 }
 
 func initDockerPool() (*dockertest.Pool, error) {
@@ -212,6 +204,6 @@ func initPostgres(ctx context.Context, cfg app.PostgresConfig) (*dockertest.Reso
 	return pgRes, nil
 }
 
-func initGRPC(env string, mock bool, cfg app.GrpcClientConfig) (auth.GRPCCLient, error) {
-	return app.NewGRPClient(log, env, mock, cfg)
+func initGRPC(env string, mock bool, cfg app.GrpcClientConfig) (auth.Client, error) {
+	return app.NewAuthClient(log, env, mock, cfg)
 }

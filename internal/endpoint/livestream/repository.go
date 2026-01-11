@@ -2,61 +2,49 @@ package livestream
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"log/slog"
 	"main/internal/db"
 	"main/internal/lib/sl"
-	"strconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
-type LivestreamId int
-
-func (m LivestreamId) MarshalBinary() ([]byte, error) {
-	return json.Marshal(m)
-}
-
 // TODO: sync redis and pg
-// TODO: 48 hours ttl for every record in redis
 // cleanup if updater can't get livestream data
 // TODO: add to tc_livestream_history upon livestream end
 type RepositoryImpl struct {
-	rdb  *redis.Client
 	pool *pgxpool.Pool
-	// set of livestream ids sorted by viewers
-	sorted *sortedIDStore
-	// livestream store
-	store *livestreamStore
-	// map from username (channel) to livestream id
-	userMap *userToIdStore
-	// set of livestream ids
-	ids *idStore
+	// cache is actually primary database for livestreams
+	cache *cache
 }
 
 func NewRepo(rdb *redis.Client, pool *pgxpool.Pool) *RepositoryImpl {
-	sorted := sortedIDStore{rdb: rdb}
-	store := livestreamStore{rdb: rdb}
-	userMap := userToIdStore{rdb: rdb}
-	ids := idStore{rdb: rdb}
+	cache := newCache(rdb)
 
-	return &RepositoryImpl{rdb: rdb,
-		pool:    pool,
-		sorted:  &sorted,
-		store:   &store,
-		userMap: &userMap,
-		ids:     &ids}
+	return &RepositoryImpl{
+		cache: cache,
+		pool:  pool,
+	}
 }
 
-// TODO: cleanup
-func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Livestream, error) {
-	id, err := r.userMap.Get(ctx, cr.Username)
+func (r *RepositoryImpl) Get(ctx context.Context, username string) (*Livestream, error) {
+	return r.cache.get(ctx, username)
+}
 
-	if id != nil {
+func (r *RepositoryImpl) ListAll(ctx context.Context) ([]Livestream, error) {
+	return r.cache.listAll(ctx)
+}
+
+func (r *RepositoryImpl) List(ctx context.Context, category string, page, count int) ([]Livestream, error) {
+	return r.cache.list(ctx, category, page, count)
+}
+
+func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Livestream, error) {
+	exists, err := r.cache.exists(ctx, cr.Username)
+
+	if exists {
 		return nil, errAlreadyStarted
 	}
 
@@ -73,8 +61,8 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 	q := QueriesAdapter{queries: db.New(conn)}
 	ins, err := q.Insert(ctx, db.LivestreamInsertParams{
 		Name:  cr.Username,
-		Link:  cr.CategoryLink,
-		Title: pgtype.Text{String: cr.Title, Valid: true},
+		Link:  cr.Category,
+		Title: cr.Title,
 	})
 	if err != nil {
 		return nil, err
@@ -96,7 +84,8 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 		Thumbnail: "", // we don't have frames for thumbnail upon creation
 	}
 
-	err = r.addLivestream(ctx, ls)
+	// TODO: insert success into cache failure -> big bad
+	err = r.cache.add(ctx, ls)
 	if err != nil {
 		return nil, err
 	}
@@ -104,83 +93,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 	return &ls, nil
 }
 
-func (r *RepositoryImpl) Get(ctx context.Context, username string) (*Livestream, error) {
-	lsId, err := r.userMap.Get(ctx, username)
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return nil, errNotFound
-		}
-
-		return nil, fmt.Errorf("unable to find %s's livestream: %w", username, err)
-	}
-
-	ls, err := r.store.Get(ctx, *lsId)
-	if err != nil {
-		return nil, err
-	}
-
-	return ls, nil
-}
-
-// TODO: impl
-func (r *RepositoryImpl) ListById(ctx context.Context, categoryId string, page, count int) ([]Livestream, error) {
-	// categoryLink, err := r.stringLinkGet(ctx, categoryId)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// ids, err := r.sorted.Get(ctx, *categoryLink, page, count)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// return r.store.List(ctx, ids)
-	return nil, errors.New("not implemented")
-}
-
-func (r *RepositoryImpl) ListAll(ctx context.Context) ([]Livestream, error) {
-	ids, err := r.ids.GetAll(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	livestreams, err := r.store.List(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-
-	return livestreams, nil
-}
-
-func (r *RepositoryImpl) List(ctx context.Context, category string, page, count int) ([]Livestream, error) {
-	ids, err := r.sorted.Get(ctx, category, page, count)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := r.store.List(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-
-	return res, nil
-}
-
 func (r *RepositoryImpl) UpdateViewers(ctx context.Context, user string, viewers int32) error {
-	id, err := r.userMap.Get(ctx, user)
-	if err != nil {
-		return err
-	}
-
-	ls, err := r.store.Get(ctx, *id)
-	if err != nil {
-		return err
-	}
-
-	if err = r.sorted.Add(ctx, ls.Category.Link, viewers, *id).Err(); err != nil {
-		return err
-	}
-
 	// NOTE: viewers count is not that important in postgres since it is used only in follow list
 	// so we can fire an update query and forget about it
 	// TODO: cleanup + handle errors properly (possibly)
@@ -202,31 +115,10 @@ func (r *RepositoryImpl) UpdateViewers(ctx context.Context, user string, viewers
 		}
 	}()
 
-	return r.store.UpdateViewers(ctx, *id, int(viewers))
+	return r.cache.updateViewers(ctx, user, viewers)
 }
 
-func (r *RepositoryImpl) UpdateThumbnail(ctx context.Context, user, thumbnail string) error {
-	lsId, err := r.userMap.Get(ctx, user)
-	if err != nil {
-		return nil
-	}
-
-	return r.store.UpdateThumbnail(ctx, *lsId, thumbnail)
-}
-
-func (r *RepositoryImpl) Update(ctx context.Context, cur *Livestream, upd LivestreamUpdate) (*Livestream, error) {
-	if upd.CategoryLink != nil {
-		cur.Category.Link = *upd.CategoryLink
-	}
-
-	if upd.Thumbnail != nil {
-		cur.Thumbnail = *upd.Thumbnail
-	}
-
-	if upd.Title != nil {
-		cur.Title = *upd.Title
-	}
-
+func (r *RepositoryImpl) Update(ctx context.Context, channel string, upd LivestreamUpdate) (*Livestream, error) {
 	conn, err := r.pool.Acquire(ctx)
 	if err != nil {
 		return nil, err
@@ -234,113 +126,63 @@ func (r *RepositoryImpl) Update(ctx context.Context, cur *Livestream, upd Livest
 	defer conn.Release()
 
 	q := QueriesAdapter{queries: db.New(conn)}
+	// NOTE: for some reason sqlc generates types like that
+	// TODO: fix someday?
+	// TODO: pass user id and not username because username can be changed in realtime
 	updated, err := q.Update(ctx, db.LivestreamUpdateParams{
-		Title:   pgtype.Text{String: cur.Title, Valid: true},
-		Viewers: cur.Viewers,
-		Link:    cur.Category.Link,
-		Name:    cur.User.Name,
+		Title: pgtype.Text{
+			String: upd.Title.Value,
+			Valid:  upd.Title.Explicit && !upd.Title.IsNull},
+		TitleDoUpdate: pgtype.Bool{
+			Bool:  upd.Title.Explicit && !upd.Title.IsNull,
+			Valid: true},
+
+		IDCategory: pgtype.Int4{
+			Int32: int32(upd.CategoryId.Value),
+			Valid: upd.CategoryId.Explicit && !upd.CategoryId.IsNull,
+		},
+		IDCategoryDoUpdate: pgtype.Bool{
+			Bool:  upd.CategoryId.Explicit && !upd.CategoryId.IsNull,
+			Valid: true,
+		},
+
+		Username: pgtype.Text{
+			String: channel,
+			Valid:  true,
+		},
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	cur.Category.Link = updated.CategoryLink
-	cur.Category.Name = updated.CategoryName
-	cur.User.Name = updated.UserName
-	cur.User.Avatar = updated.UserAvatar.String
-
-	err = r.addLivestream(ctx, *cur)
-	if err != nil {
-		return nil, err
-	}
-
-	return cur, nil
+	return r.cache.update(ctx,
+		updated.LivestreamID,
+		updated.Title,
+		User{
+			Name:   updated.UserName,
+			Avatar: updated.UserAvatar.String,
+		}, Category{
+			Name: updated.CategoryName,
+			Link: updated.CategoryLink,
+		})
 }
 
-// TODO: sentinel error to return 200 on multiple deletes
-func (r *RepositoryImpl) Delete(ctx context.Context, username string) (bool, error) {
-	lsId, err := r.userMap.Get(ctx, username)
+func (r *RepositoryImpl) UpdateThumbnail(ctx context.Context, user, thumbnail string) error {
+	return r.cache.updateThumbnail(ctx, user, thumbnail)
+}
+
+func (r *RepositoryImpl) Delete(ctx context.Context, username string) error {
+	err := r.cache.delete(ctx, username)
 	if err != nil {
-		return false, err
-	}
-
-	if lsId == nil {
-		return false, errAlreadyEnded
-	}
-
-	ls, err := r.store.Get(ctx, *lsId)
-	if err != nil {
-		return false, err
-	}
-
-	// TODO: check if trasnsaction + pipeline is working =)
-	tx := r.rdb.TxPipeline()
-
-	userMapCmd := r.userMap.TxDelete(ctx, tx, username)
-	sortedCmd := r.sorted.TxDelete(ctx, tx, ls.Category.Link)
-	storeCmd := r.store.TxDelete(ctx, tx, *lsId)
-	idsCmd := r.ids.TxDelete(ctx, tx, *lsId)
-
-	_, err = tx.Exec(ctx)
-	if err != nil {
-		return false, fmt.Errorf("transaction failed: %w", err)
-	}
-
-	if userMapCmd.Err() != nil {
-		return false, fmt.Errorf("unable to delete livestream from userMap: %w", userMapCmd.Err())
-	}
-	if sortedCmd.Err() != nil {
-		return false, fmt.Errorf("unable to delete livestream from sorted set: %w", sortedCmd.Err())
-	}
-	if storeCmd.Err() != nil {
-		return false, fmt.Errorf("unable to delete livestream from set: %w", storeCmd.Err())
-	}
-	if idsCmd.Err() != nil {
-		return false, fmt.Errorf("unable to delete livestream id from set: %w", idsCmd.Err())
+		return err
 	}
 
 	conn, err := r.pool.Acquire(ctx)
 	if err != nil {
-		return false, err
+		return err
 	}
 	defer conn.Release()
 
 	q := QueriesAdapter{queries: db.New(conn)}
-	err = q.Delete(ctx, username)
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
-func (r *RepositoryImpl) addLivestream(ctx context.Context, ls Livestream) error {
-	lsIdStr := strconv.Itoa(int(ls.Id))
-
-	tx := r.rdb.TxPipeline()
-
-	userMapCmd := r.userMap.TxAdd(ctx, tx, ls.User.Name, lsIdStr)
-	sortedCmd := r.sorted.TxAdd(ctx, tx, ls.Category.Link, ls.Viewers, lsIdStr)
-	storeCmd := r.store.TxAdd(ctx, tx, ls)
-	idsCmd := r.ids.TxAdd(ctx, tx, lsIdStr)
-
-	_, err := tx.Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("transaction failed: %w", err)
-	}
-
-	if userMapCmd.Err() != nil {
-		return fmt.Errorf("unable to add livestream to userMap: %w", userMapCmd.Err())
-	}
-	if sortedCmd.Err() != nil {
-		return fmt.Errorf("unable to add livestream to sorted set: %w", sortedCmd.Err())
-	}
-	if storeCmd.Err() != nil {
-		return fmt.Errorf("unable to add livestream to set: %w", storeCmd.Err())
-	}
-	if idsCmd.Err() != nil {
-		return fmt.Errorf("unable to add livestream id to set: %w", idsCmd.Err())
-	}
-
-	return nil
+	return q.Delete(ctx, username)
 }

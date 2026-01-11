@@ -7,41 +7,73 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/handler"
-	l "main/pkg/api/livestream"
+	l "main/pkg/api/model/livestream"
 	"net/http"
 	"strconv"
 )
 
-type Service interface {
+type Getter interface {
 	Get(ctx context.Context, username string) (*Livestream, error)
-	Update(ctx context.Context, user string, ls LivestreamUpdate) (bool, error)
-	List(ctx context.Context, s LivestreamSearch) ([]Livestream, error)
+}
+
+type Creater interface {
+	Create(ctx context.Context, cr LivestreamCreate) (*Livestream, error)
+}
+
+type Updater interface {
+	Update(ctx context.Context, channel string, upd LivestreamUpdate) (*Livestream, error)
+	UpdateViewers(ctx context.Context, channel string, viewers int32) error
+	UpdateThumbnail(ctx context.Context, channel, thumbnail string) error
+}
+
+type Lister interface {
+	List(ctx context.Context, category string, page, count int) ([]Livestream, error)
+	ListAll(ctx context.Context) ([]Livestream, error)
+}
+
+type Deleter interface {
+	Delete(ctx context.Context, username string) (bool, error)
+}
+
+type Repository interface {
+	Getter
+	Creater
+	Updater
+	Lister
+	Deleter
+}
+
+type GetterListerUpdater interface {
+	Getter
+	Lister
+	Updater
 }
 
 type Handler struct {
-	s   Service
+	r   GetterListerUpdater
 	log *slog.Logger
 }
 
-func NewHandler(log *slog.Logger, s Service) *Handler {
-	return &Handler{s: s, log: log}
+func NewHandler(log *slog.Logger, r GetterListerUpdater) *Handler {
+	return &Handler{r: r, log: log}
 }
 
-// GetLivestream godoc
-// @Summary      Get livestream data by username
-// @Description  Retrieves livestream information for the specified streamer username
-// @Tags         livestream
+// Get godoc
+// @Summary      Get livestream details
+// @Description  Retrieve current livestream data for a streamer
+// @Tags         Livestreams
 // @Accept       json
 // @Produce      json
-// @Param        username  path      string  true  "Streamer Username"
-// @Success      200       {object}  GetResponse
-// @Failure      500       {object}  er.RequestError
+// @Param        username  path  string  true  "Streamer username"  min(1)
+// @Success      200       {object}  l.GetResponse  "Livestream details"
+// @Failure      404       {object}  handler.ErrorResponse  "Livestream not found"
+// @Failure      500       {object}  handler.ErrorResponse  "Internal server error"
 // @Router       /livestreams/{username} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	const op = "getting livestream data"
 
 	streamer := r.PathValue("username")
-	ls, err := h.s.Get(r.Context(), streamer)
+	ls, err := h.r.Get(r.Context(), streamer)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
 			handler.Error(h.log, w, op, err, http.StatusNotFound, errNotFound.Error())
@@ -74,27 +106,31 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // List godoc
-// @Summary List livestreams by category or category ID
-// @Description Retrieves a paginated list of livestreams filtered by category or category ID.
-// @Tags livestream
-// @Accept json
-// @Produce json
-// @Param category query string false "Category name to filter by"
-// @Param categoryId query string false "Category ID to filter by"
-// @Param page query int false "Page number for pagination (default 1)" default(1)
-// @Param count query int false "Number of results per page (default 10)" default(10)
-// @Success 200 {object} ListResponse "Livestream list response"
-// @Failure 400 {object} er.RequestError "Bad request: missing or invalid parameters"
-// @Failure 500 {object} er.RequestError "Internal server error"
-// @Router /livestreams [get]
+// @Summary      List livestreams
+// @Description  Get paginated list of livestreams filtered by category
+// @Tags         Livestreams
+// @Accept       json
+// @Produce      json
+// @Param        categoryId  query  string  false  "Category ID (numeric)"
+// @Param        category    query  string  false  "Category link (e.g. path-of-exile)"  min(1)
+// @Param        page        query  string  false  "Page number (default: 1)"
+// @Param        count       query  string  false  "Items per page (default: 10)"
+// @Success      200         {object}  l.ListResponse
+// @Failure      400         {object}  handler.ErrorResponse  "Missing category filter or invalid pagination"
+// @Failure      500         {object}  handler.ErrorResponse  "Internal server error"
+// @Router       /livestreams [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	const op = "getting livestreams"
 
 	category := r.URL.Query().Get("category")
-	categoryId := r.URL.Query().Get("categoryId")
-	if categoryId == "" && category == "" {
+	categoryIdentifier := r.URL.Query().Get("categoryId")
+	if categoryIdentifier == "" && category == "" {
 		handler.Error(h.log, w, op, errNoCategory, http.StatusBadRequest, errNoCategory.Error())
 		return
+	}
+
+	if categoryIdentifier == "" {
+		categoryIdentifier = category
 	}
 
 	page := r.URL.Query().Get("page")
@@ -108,6 +144,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if pageInt < 1 {
+		pageInt = 1
+	}
+
 	count := r.URL.Query().Get("count")
 	if count == "" {
 		count = "10"
@@ -119,12 +159,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	livestreams, err := h.s.List(r.Context(), LivestreamSearch{
-		CategoryId: categoryId,
-		Category:   category,
-		Page:       pageInt,
-		Count:      countInt,
-	})
+	if countInt < 1 {
+		countInt = 10
+	}
+
+	livestreams, err := h.r.List(r.Context(), categoryIdentifier, pageInt, countInt)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
@@ -142,12 +181,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 				Name: ls.Category.Name,
 				Link: ls.Category.Link,
 			},
-			StartedAt:     int(ls.StartedAt),
-			IsLive:        true,
-			IsMultistream: false,
-			Thumbnail:     ls.Thumbnail,
-			Viewers:       ls.Viewers,
-			Title:         ls.Title,
+			StartedAt: int(ls.StartedAt),
+			Thumbnail: ls.Thumbnail,
+			Viewers:   ls.Viewers,
+			Title:     ls.Title,
 		}
 	}
 
@@ -205,19 +242,19 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: sentinel error
-	status, err := h.s.Update(r.Context(),
-		username, LivestreamUpdate{
-			Title:        request.Title,
-			CategoryLink: request.CategoryLink,
-		})
+	// TODO: eventual consistency between postgres and redis
+	// (postgres got updated while redis is down -> big bad)
+	_, err = h.r.Update(r.Context(), username, LivestreamUpdate{
+		Title:      request.Title,
+		CategoryId: request.CategoryId,
+	})
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
 	resp := l.PatchResponse{
-		Status: status,
+		Status: true,
 	}
 
 	json.NewEncoder(w).Encode(resp)

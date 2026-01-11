@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS tc_user(
     first_livestream DATE DEFAULT NULL,
     last_livestream DATE DEFAULT NULL,
     stream_token TEXT DEFAULT NULL,
-    is_live BOOLEAN NOT NULL DEFAULT FALSE,
     avatar TEXT DEFAULT NULL,
     offline_background TEXT NOT NULL DEFAULT 'default_offline_background.png',
     description TEXT DEFAULT NULL,
@@ -86,7 +85,8 @@ CREATE TABLE IF NOT EXISTS tc_livestream(
     id_user INTEGER NOT NULL,
     id_category INTEGER NOT NULL,
     viewers INTEGER NOT NULL DEFAULT 0,
-    title TEXT NOT NULL DEFAULT '',
+    title TEXT DEFAULT NULL,
+    is_live BOOLEAN NOT NULL DEFAULT TRUE,
     started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_multistream BOOLEAN NOT NULL DEFAULT FALSE,
 

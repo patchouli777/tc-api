@@ -58,9 +58,9 @@ WHERE
 SELECT
     u.name AS username,
     f.name AS following,
-    f.avatar as avatar,
+    f.is_live,
+    f.avatar AS avatar,
     ls.viewers,
-    ls.is_live,
     ls.title,
     c.name AS category
 FROM
@@ -76,5 +76,5 @@ LEFT JOIN
 WHERE
     u.name = $1
 ORDER BY
-    ls.is_live ASC, ls.viewers DESC
+    f.is_live ASC, ls.viewers DESC
 LIMIT 50;

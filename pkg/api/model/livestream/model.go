@@ -1,9 +1,13 @@
 package livestream
 
+import "main/internal/lib/null"
+
 type LivestreamCategory struct {
+	Id   int    `json:"id"`
 	Link string `json:"link"`
 	Name string `json:"name"`
 }
+
 type GetRequest struct {
 	Channel string `json:"channel"`
 }
@@ -22,6 +26,25 @@ type GetResponse struct {
 	Category      LivestreamCategory `json:"category"`
 }
 
+type ListRequest struct {
+	Page  int `json:"page"`
+	Count int `json:"count"`
+}
+type ListResponse struct {
+	Livestreams []ListResponseItem `json:"livestreams"`
+}
+type ListResponseItem struct {
+	Username  string             `json:"username"`
+	Title     string             `json:"title"`
+	Avatar    string             `json:"avatar"`
+	StartedAt int                `json:"started_at"`
+	Thumbnail string             `json:"thumbnail"`
+	Viewers   int32              `json:"viewers"`
+	Category  LivestreamCategory `json:"category"`
+	// IsMultistream bool               `json:"is_multistream"`
+	// IsPartner     bool   `json:"is_partner"`
+}
+
 type PostRequest struct {
 	Title        string `json:"title"`
 	CategoryLink string `json:"category_link"`
@@ -35,8 +58,9 @@ type PostResponse struct {
 }
 
 type PatchRequest struct {
-	Title        *string `json:"title"`
-	CategoryLink *string `json:"category_link"`
+	// Channel      null.String `json:"channel"`
+	Title      null.String `json:"title"`
+	CategoryId null.Int    `json:"category_id"`
 }
 type PatchResponse struct {
 	Status bool
@@ -45,24 +69,4 @@ type PatchResponse struct {
 type DeleteRequest struct{}
 type DeleteResponse struct {
 	Status bool `json:"status"`
-}
-
-type ListRequest struct {
-	Page  int `json:"page"`
-	Count int `json:"count"`
-}
-type ListResponse struct {
-	Livestreams []ListResponseItem `json:"livestreams"`
-}
-type ListResponseItem struct {
-	Username      string             `json:"username"`
-	Title         string             `json:"title"`
-	Avatar        string             `json:"avatar"`
-	StartedAt     int                `json:"started_at"`
-	IsLive        bool               `json:"is_live"`
-	IsMultistream bool               `json:"is_multistream"`
-	Thumbnail     string             `json:"thumbnail"`
-	Viewers       int32              `json:"viewers"`
-	Category      LivestreamCategory `json:"category"`
-	// IsPartner     bool   `json:"is_partner"`
 }

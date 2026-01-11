@@ -12,31 +12,40 @@ type userToIdStore struct {
 	rdb *redis.Client
 }
 
-func (r *userToIdStore) Delete(ctx context.Context, username string) *redis.IntCmd {
-	return r.rdb.Del(ctx, r.Key(username))
+func (r *userToIdStore) add(ctx context.Context, username string, lsId string) (*redis.StatusCmd, error) {
+	return r.rdb.Set(ctx, r.key(username), lsId, 0), nil
 }
 
-func (r *userToIdStore) TxDelete(ctx context.Context, tx redis.Pipeliner, username string) *redis.IntCmd {
-	return tx.Del(ctx, r.Key(username))
+func (r *userToIdStore) addTx(ctx context.Context, tx redis.Pipeliner, username string, lsId string) *redis.StatusCmd {
+	return tx.Set(ctx, r.key(username), lsId, 0)
 }
 
-func (r *userToIdStore) Key(username string) string {
-	return fmt.Sprintf("livestreams_ids:%s", username)
-}
-
-func (r *userToIdStore) Add(ctx context.Context, username string, lsId string) (*redis.StatusCmd, error) {
-	return r.rdb.Set(ctx, r.Key(username), lsId, 0), nil
-}
-
-func (r *userToIdStore) TxAdd(ctx context.Context, tx redis.Pipeliner, username string, lsId string) *redis.StatusCmd {
-	return tx.Set(ctx, r.Key(username), lsId, 0)
-}
-
-func (r *userToIdStore) Get(ctx context.Context, username string) (*string, error) {
-	res, err := r.rdb.Get(ctx, r.Key(username)).Result()
+func (r *userToIdStore) get(ctx context.Context, username string) (string, error) {
+	res, err := r.rdb.Get(ctx, r.key(username)).Result()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return &res, nil
+	return res, nil
+}
+
+func (r *userToIdStore) getTx(ctx context.Context, tx redis.Pipeliner, username string) (string, error) {
+	res, err := tx.Get(ctx, r.key(username)).Result()
+	if err != nil {
+		return "", err
+	}
+
+	return res, nil
+}
+
+func (r *userToIdStore) delete(ctx context.Context, username string) *redis.IntCmd {
+	return r.rdb.Del(ctx, r.key(username))
+}
+
+func (r *userToIdStore) deleteTx(ctx context.Context, tx redis.Pipeliner, username string) *redis.IntCmd {
+	return tx.Del(ctx, r.key(username))
+}
+
+func (r *userToIdStore) key(username string) string {
+	return fmt.Sprintf("livestreams_ids:%s", username)
 }

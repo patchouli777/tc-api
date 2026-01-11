@@ -3,7 +3,6 @@ package setup
 import (
 	"context"
 	"log"
-	"main/pkg/util"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,13 +16,15 @@ func RecreateSchema(pool *pgxpool.Pool, rdb *redis.Client) {
 		log.Fatalf("unable to acquire connection: %v", err)
 	}
 
-	root := util.GetProjectRoot()
+	// root := util.GetProjectRoot()
 
-	b, err := os.ReadFile(root + "\\internal\\db\\scripts\\remove_all.sql")
+	// b, err := os.ReadFile(root + "\\internal\\db\\scripts\\remove_all.sql")
+	b, err := os.ReadFile(".\\internal\\db\\scripts\\remove_all.sql")
 	if err != nil {
 		log.Printf("unable to read file deleting schema in internal: %v", err)
 
-		b, err = os.ReadFile(root + "\\remove_all.sql")
+		// b, err = os.ReadFile(root + "\\remove_all.sql")
+		b, err = os.ReadFile(".\\remove_all.sql")
 		if err != nil {
 			log.Fatalf("unable to read file deleting schema in current dir: %v", err)
 		}
@@ -38,11 +39,13 @@ func RecreateSchema(pool *pgxpool.Pool, rdb *redis.Client) {
 
 	rdb.FlushAll(ctx)
 
-	b, err = os.ReadFile(root + "\\internal\\db\\scripts\\schema.sql")
+	// b, err = os.ReadFile(root + "\\internal\\db\\scripts\\schema.sql")
+	b, err = os.ReadFile(".\\internal\\db\\scripts\\schema.sql")
 	if err != nil {
 		log.Printf("unable to read file creating schema in internal: %v", err)
 
-		b, err = os.ReadFile(root + "\\schema.sql")
+		// b, err = os.ReadFile(root + "\\schema.sql")
+		b, err = os.ReadFile(".\\schema.sql")
 		if err != nil {
 			log.Fatalf("unable to read file deleting schema in current dir: %v", err)
 		}

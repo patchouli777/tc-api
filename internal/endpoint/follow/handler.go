@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/handler"
-	f "main/pkg/api/follow"
+	f "main/pkg/api/model/follow"
 	"net/http"
 )
 
@@ -28,16 +28,17 @@ func NewHandler(log *slog.Logger, s Service) *Handler {
 }
 
 // Get godoc
-// @Summary is user a follower of other user
-// @Description Returns json response
-// @Tags follow
-// @Param username path string true "follower"
-// @Param followed query string true "followed"
-// @Produce json
-// @Success 200 {object} GetResponse
-// @Failure 400 {object} er.RequestError "Bad Request"
-// @Failure 500 {object} er.RequestError "Internal Server Error"
-// @Router /follow/{username} [get]
+// @Summary      Check follow status
+// @Description  Check if one user follows another
+// @Tags         Follows
+// @Accept       json
+// @Produce      json
+// @Param        username  path     string  true  "Follower username"  min(1)
+// @Param        followed  query    string  true  "Followed username"  min(1)
+// @Success      200       {object}  f.GetResponse
+// @Failure      400       {object}  handler.ErrorResponse  "Missing followed parameter"
+// @Failure      500       {object}  handler.ErrorResponse  "Internal server error"
+// @Router       /follows/{username} [get]
 func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 	const op = "getting follow status"
 
@@ -60,18 +61,18 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // List godoc
-// @Summary Retrieve follower's follow list
-// @Description Lists the followees of a given follower username. If `extended=true` is passed as a query parameter, returns detailed info per followee.
-// @Tags follow
-// @Accept json
-// @Produce json
-// @Param follower query string true "Follower username whose follow list is requested"
-// @Param extended query string false "If set to 'true', returns extended follow list details"
-// @Success 200 {object} ListResponse "Basic follow list response"
-// @Success 200 {object} ListExtendedResponse "Extended follow list response"
-// @Failure 400 {object} er.RequestError "Bad request: follower username is missing"
-// @Failure 500 {object} er.RequestError "Internal server error while retrieving follow list"
-// @Router /follows [get]
+// @Summary      List user's follows
+// @Description  Get list of users that a follower is following (basic or extended)
+// @Tags         Follows
+// @Accept       json
+// @Produce      json
+// @Param        follower  query    string  true  "Follower username"  min(1)
+// @Param        extended  query    string  false "Include extended data (true/false)"  Enums(true, false)
+// @Success      200  {object}  f.ListResponse          "Basic follow list"
+// @Success      200  {object}  f.ListExtendedResponse  "Extended follow list"
+// @Failure      400  {object}  handler.ErrorResponse  "Missing follower parameter"
+// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
+// @Router       /follows [get]
 func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 	const op = "getting follow list"
 
@@ -115,19 +116,20 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Post godoc
-// @Summary Follow a user
-// @Description Allows the authenticated user to follow another user by username
-// @Tags follow
-// @Accept json
-// @Produce json
-// @Param username path string true "Username of the user to follow"
-// @Param following query string true "Username of the user to be followed"
-// @Success 200 {string} string "Follow successful"
-// @Failure 400 {object} er.RequestError "Bad Request: user mismatch"
-// @Failure 500 {object} er.RequestError "Internal Server Error: failed to follow user"
-// @Router /follow/{username} [post]
+// @Summary      Follow a user
+// @Description  Current user follows another user
+// @Tags         Follows
+// @Accept       json
+// @Produce      json
+// @Param        username   path     string  true  "Username to follow for (must match auth user)"  min(1)
+// @Param        auth       header   string  true  "Bearer token"  format(jwt)
+// @Param        following  query    string  true  "Username to follow"  min(1)
+// @Security     BearerAuth
+// @Success      204  "User followed successfully"
+// @Failure      400  {object}  handler.ErrorResponse  "Invalid auth or username mismatch"
+// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
+// @Router       /follows/{username} [post]
 func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
-	// TODO: update doc
 	const op = "following user"
 
 	username := r.PathValue("username")
@@ -157,17 +159,19 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete godoc
-// @Summary Unfollow a user
-// @Description Allows the authenticated user to unfollow another user by username
-// @Tags follow
-// @Accept json
-// @Produce json
-// @Param username path string true "Username of the user to unfollow"
-// @Param unfollowing query string true "Username of the user to be unfollowed"
-// @Success 200 {string} string "Unfollow successful"
-// @Failure 400 {object} er.RequestError "Bad Request: user mismatch"
-// @Failure 500 {object} er.RequestError "Internal Server Error: failed to unfollow user"
-// @Router /follow/{username} [delete]
+// @Summary      Unfollow a user
+// @Description  Current user stops following another user
+// @Tags         Follows
+// @Accept       json
+// @Produce      json
+// @Param        username    path     string  true  "Username to unfollow for (must match auth user)"  min(1)
+// @Param        auth        header   string  true  "Bearer token"  format(jwt)
+// @Param        unfollowing query    string  true  "Username to unfollow"  min(1)
+// @Security     BearerAuth
+// @Success      204  "User unfollowed successfully"
+// @Failure      400  {object}  handler.ErrorResponse  "Invalid auth or username mismatch"
+// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
+// @Router       /follows/{username} [delete]
 func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	const op = "unfollowing user"
 

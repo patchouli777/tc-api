@@ -6,23 +6,19 @@ import (
 	"main/internal/db"
 )
 
-// TODO: refresh, access unused
-type GRPCCLient interface {
-	GetRefresh(ctx context.Context, ui UserInfo) (*Token, error)
-	GetAccess(ctx context.Context, ui UserInfo) (*Token, error)
+type Client interface {
 	GetPair(ctx context.Context, ui UserInfo) (*TokenPair, error)
 }
 
 type ServiceImpl struct {
 	queries *QueriesAdapter
-	grpc    GRPCCLient
+	ac      Client
 }
 
-func NewService(grpc GRPCCLient, adapter *QueriesAdapter) *ServiceImpl {
-	return &ServiceImpl{grpc: grpc, queries: adapter}
+func NewService(ac Client, adapter *QueriesAdapter) *ServiceImpl {
+	return &ServiceImpl{ac: ac, queries: adapter}
 }
 
-// TODO: grpc client stuff
 func (s *ServiceImpl) SignIn(ctx context.Context, username, password string) (*TokenPair, error) {
 	ui, err := s.queries.Select(ctx, db.AuthSelectUserParams{Name: username, Password: password})
 	if err != nil {
@@ -33,7 +29,7 @@ func (s *ServiceImpl) SignIn(ctx context.Context, username, password string) (*T
 		return nil, err
 	}
 
-	pair, err := s.grpc.GetPair(ctx, UserInfo{Id: ui.ID, Username: username, Role: string(ui.AppRole)})
+	pair, err := s.ac.GetPair(ctx, UserInfo{Id: ui.ID, Username: username, Role: string(ui.AppRole)})
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +47,7 @@ func (s *ServiceImpl) SignUp(ctx context.Context, email, username, password stri
 		return nil, err
 	}
 
-	pair, err := s.grpc.GetPair(ctx, UserInfo{Username: username, Role: "user"})
+	pair, err := s.ac.GetPair(ctx, UserInfo{Username: username, Role: "user"})
 	if err != nil {
 		return nil, err
 	}

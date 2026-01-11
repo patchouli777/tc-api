@@ -7,6 +7,7 @@ import (
 	"net/http"
 )
 
+// TODO: whats this??
 func UserLogin(user User) (*TokenPair, error) {
 	req, err := http.NewRequest(http.MethodPost, "localhost:8090/api"+"/auth/login", nil)
 	if err != nil {

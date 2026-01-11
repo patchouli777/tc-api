@@ -31,8 +31,8 @@ import (
 // @externalDocs.url          https://swagger.io/resources/open-api/
 func addRoutes(mux *http.ServeMux,
 	log *slog.Logger,
-	cs category.Repository,
-	lss livestream.Service,
+	cr *category.RepositoryImpl,
+	lsr *livestream.RepositoryImpl,
 	chs channel.Service,
 	as auth.Service,
 	fs follow.Service,
@@ -41,18 +41,19 @@ func addRoutes(mux *http.ServeMux,
 	var authMiddleware = authUtils.AuthMiddleware
 	apiMux := http.NewServeMux()
 
-	livestreamsHandler := livestream.NewHandler(log, lss)
+	livestreamsHandler := livestream.NewHandler(log, lsr)
 	apiMux.HandleFunc("GET /livestreams", livestreamsHandler.List)
 	apiMux.HandleFunc("GET /livestreams/{username}", livestreamsHandler.Get)
 	apiMux.HandleFunc("PATCH /livestreams/{username}", authMiddleware(log, livestreamsHandler.Patch))
 
 	// {categoryIdentifier} is either int id or category link (e.g. "path-of-exile")
-	categoriesHandler := category.NewHandler(log, cs)
+	categoriesHandler := category.NewHandler(log, cr)
 	apiMux.HandleFunc("GET /categories", categoriesHandler.List)
 	apiMux.HandleFunc("GET /categories/{categoryIdentifier}", categoriesHandler.Get)
-	apiMux.HandleFunc("POST /categories", authMiddleware(log, categoriesHandler.Post))
-	apiMux.HandleFunc("PATCH /categories/{categoryIdentifier}", authMiddleware(log, categoriesHandler.Patch))
-	apiMux.HandleFunc("DELETE /categories/{categoryIdentifier}", authMiddleware(log, categoriesHandler.Delete))
+	// TODO: authmiddleware
+	apiMux.HandleFunc("POST /categories", categoriesHandler.Post)
+	apiMux.HandleFunc("PATCH /categories/{categoryIdentifier}", categoriesHandler.Patch)
+	apiMux.HandleFunc("DELETE /categories/{categoryIdentifier}", categoriesHandler.Delete)
 
 	authHandler := auth.NewHandler(log, as)
 	apiMux.HandleFunc("POST /auth/signin", authHandler.SignIn)

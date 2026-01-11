@@ -42,6 +42,7 @@ func main() {
 	pool, err := pgxpool.New(ctx, postgresConnURL)
 	if err != nil {
 		log.Error("unable to create connection pool", sl.Err(err))
+		os.Exit(1)
 	}
 
 	setup.RecreateSchema(pool, rdb)
@@ -49,7 +50,7 @@ func main() {
 	srvcs := app.InitApp(ctx, log,
 		cfg.InstanceID.String(),
 		cfg.Env,
-		&auth.GRPCClientMock{},
+		&auth.AuthClientMock{},
 		rdb,
 		pool)
 

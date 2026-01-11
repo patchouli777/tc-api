@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"main/internal/lib/handler"
-	c "main/pkg/api/channel"
+	c "main/pkg/api/model/channel"
 	"net/http"
 )
 
@@ -24,6 +24,17 @@ func NewHandler(log *slog.Logger, s Service) *Handler {
 	return &Handler{cs: s, log: log}
 }
 
+// Get retrieves a channel by its ID (username of owner)
+// @Summary      Get channel details
+// @Description  Retrieve detailed information about a specific channel
+// @Tags         Channels
+// @Accept       json
+// @Produce      json
+// @Param        channel  path  string  true  "Channel identifier"  min(1)
+// @Success      200      {object}  c.GetResponse  "Channel details"
+// @Failure      400      {object}  handler.ErrorResponse  "Missing channel identifier"
+// @Failure      500      {object}  handler.ErrorResponse  "Internal server error"
+// @Router       /channels/{channel} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	const op = "getting channel"
 

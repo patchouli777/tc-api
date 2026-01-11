@@ -2,6 +2,7 @@ package livestream
 
 import (
 	"encoding/json"
+	"main/internal/lib/null"
 )
 
 type Livestream struct {
@@ -15,15 +16,15 @@ type Livestream struct {
 }
 
 type LivestreamUpdate struct {
-	Title        *string
-	Thumbnail    *string
-	CategoryLink *string
+	Title      null.String
+	CategoryId null.Int
 }
 
 type LivestreamCreate struct {
-	Title        string
-	CategoryLink string
-	Username     string
+	Title string
+	// TODO: type CategoryIdentifier + methods IsLink(), IsId()
+	Category string
+	Username string
 }
 
 type LivestreamSearch struct {

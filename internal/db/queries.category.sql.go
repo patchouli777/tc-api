@@ -11,28 +11,101 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const categoryAddTags = `-- name: CategoryAddTags :many
+WITH inserted AS (
+INSERT INTO
+    tc_category_tag (id_category, id_tag)
+    SELECT
+        $1::int,
+        UNNEST($2::int[])
+    ON CONFLICT
+        (id_category, id_tag)
+    DO NOTHING
+    RETURNING id_category, id_tag
+)
+SELECT
+    inserted.id_tag AS tag_id,
+    name AS tag_name
+FROM
+    inserted
+INNER JOIN
+    tc_tag
+ON
+    inserted.id_tag = tc_tag.id
+WHERE
+    id_tag = inserted.id_tag
+`
+
+type CategoryAddTagsParams struct {
+	Column1 int32
+	Column2 []int32
+}
+
+type CategoryAddTagsRow struct {
+	TagID   int32
+	TagName string
+}
+
+func (q *Queries) CategoryAddTags(ctx context.Context, arg CategoryAddTagsParams) ([]CategoryAddTagsRow, error) {
+	rows, err := q.db.Query(ctx, categoryAddTags, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CategoryAddTagsRow
+	for rows.Next() {
+		var i CategoryAddTagsRow
+		if err := rows.Scan(&i.TagID, &i.TagName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const categoryDelete = `-- name: CategoryDelete :exec
+DELETE FROM
+    tc_category
+WHERE
+    id = $1
+`
+
+func (q *Queries) CategoryDelete(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, categoryDelete, id)
+	return err
+}
+
+const categoryDeleteTags = `-- name: CategoryDeleteTags :exec
+DELETE FROM
+    tc_category_tag
+WHERE
+    id_category = $1
+`
+
+func (q *Queries) CategoryDeleteTags(ctx context.Context, idCategory int32) error {
+	_, err := q.db.Exec(ctx, categoryDeleteTags, idCategory)
+	return err
+}
+
 const categoryInsert = `-- name: CategoryInsert :one
 INSERT INTO
-    tc_category(name, link, viewers, image)
+    tc_category(name, link, image)
 VALUES
-    ($1, $2, $3, $4)
+    ($1, $2, $3)
 RETURNING id, name, link, created_at, is_safe, viewers, image
 `
 
 type CategoryInsertParams struct {
-	Name    string
-	Link    string
-	Viewers int32
-	Image   pgtype.Text
+	Name  string
+	Link  string
+	Image string
 }
 
 func (q *Queries) CategoryInsert(ctx context.Context, arg CategoryInsertParams) (TcCategory, error) {
-	row := q.db.QueryRow(ctx, categoryInsert,
-		arg.Name,
-		arg.Link,
-		arg.Viewers,
-		arg.Image,
-	)
+	row := q.db.QueryRow(ctx, categoryInsert, arg.Name, arg.Link, arg.Image)
 	var i TcCategory
 	err := row.Scan(
 		&i.ID,
@@ -98,9 +171,9 @@ type CategorySelectManyParams struct {
 type CategorySelectManyRow struct {
 	CategoryID   int32
 	CategoryName string
-	IsSafe       pgtype.Bool
+	IsSafe       bool
 	Viewers      int32
-	Image        pgtype.Text
+	Image        string
 	TagID        pgtype.Int4
 	TagName      pgtype.Text
 }
@@ -131,4 +204,43 @@ func (q *Queries) CategorySelectMany(ctx context.Context, arg CategorySelectMany
 		return nil, err
 	}
 	return items, nil
+}
+
+const categoryUpdate = `-- name: CategoryUpdate :exec
+UPDATE tc_category
+SET
+    name = CASE WHEN $1::boolean THEN $2 ELSE name END,
+    link = CASE WHEN $3::boolean THEN $4 ELSE link END,
+    is_safe = CASE WHEN $5::boolean THEN $6 ELSE is_safe END,
+    image = CASE WHEN $7::boolean THEN $8 ELSE image END
+WHERE
+    id = $9
+RETURNING id, name, link, created_at, is_safe, viewers, image
+`
+
+type CategoryUpdateParams struct {
+	NameDoUpdate   bool
+	Name           string
+	LinkDoUpdate   bool
+	Link           string
+	IsSafeDoUpdate bool
+	IsSafe         bool
+	ImageDoUpdate  bool
+	Image          string
+	ID             int32
+}
+
+func (q *Queries) CategoryUpdate(ctx context.Context, arg CategoryUpdateParams) error {
+	_, err := q.db.Exec(ctx, categoryUpdate,
+		arg.NameDoUpdate,
+		arg.Name,
+		arg.LinkDoUpdate,
+		arg.Link,
+		arg.IsSafeDoUpdate,
+		arg.IsSafe,
+		arg.ImageDoUpdate,
+		arg.Image,
+		arg.ID,
+	)
+	return err
 }

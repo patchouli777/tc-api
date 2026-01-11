@@ -131,9 +131,9 @@ const followSelectManyExtended = `-- name: FollowSelectManyExtended :many
 SELECT
     u.name AS username,
     f.name AS following,
-    f.avatar as avatar,
+    f.is_live,
+    f.avatar AS avatar,
     ls.viewers,
-    ls.is_live,
     ls.title,
     c.name AS category
 FROM
@@ -149,16 +149,16 @@ LEFT JOIN
 WHERE
     u.name = $1
 ORDER BY
-    ls.is_live ASC, ls.viewers DESC
+    f.is_live ASC, ls.viewers DESC
 LIMIT 50
 `
 
 type FollowSelectManyExtendedRow struct {
 	Username  string
 	Following pgtype.Text
+	IsLive    pgtype.Bool
 	Avatar    pgtype.Text
 	Viewers   pgtype.Int4
-	IsLive    pgtype.Bool
 	Title     pgtype.Text
 	Category  pgtype.Text
 }
@@ -175,9 +175,9 @@ func (q *Queries) FollowSelectManyExtended(ctx context.Context, name string) ([]
 		if err := rows.Scan(
 			&i.Username,
 			&i.Following,
+			&i.IsLive,
 			&i.Avatar,
 			&i.Viewers,
-			&i.IsLive,
 			&i.Title,
 			&i.Category,
 		); err != nil {

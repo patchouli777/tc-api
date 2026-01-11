@@ -102,9 +102,9 @@ type TcCategory struct {
 	Name      string
 	Link      string
 	CreatedAt pgtype.Date
-	IsSafe    pgtype.Bool
+	IsSafe    bool
 	Viewers   int32
-	Image     pgtype.Text
+	Image     string
 }
 
 type TcCategoryTag struct {
@@ -117,8 +117,7 @@ type TcLivestream struct {
 	IDUser        int32
 	IDCategory    int32
 	Viewers       int32
-	Title         pgtype.Text
-	IsLive        bool
+	Title         string
 	StartedAt     pgtype.Timestamptz
 	IsMultistream bool
 }
@@ -154,6 +153,7 @@ type TcUser struct {
 	FirstLivestream   pgtype.Date
 	LastLivestream    pgtype.Date
 	StreamToken       pgtype.Text
+	IsLive            bool
 	Avatar            pgtype.Text
 	OfflineBackground string
 	Description       pgtype.Text

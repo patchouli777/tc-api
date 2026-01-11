@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/handler"
-	u "main/pkg/api/user"
+	u "main/pkg/api/model/user"
 	"net/http"
 )
 

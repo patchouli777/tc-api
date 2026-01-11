@@ -2,24 +2,33 @@
 WITH updated AS (
     UPDATE tc_livestream
     SET
-        title = $1,
-        viewers = $2,
-        id_category = (SELECT id FROM tc_category c WHERE c.link = $3)
+        title = CASE WHEN @title_do_update::boolean THEN @title ELSE title END,
+        id_category = CASE WHEN @id_category_do_update::boolean THEN @id_category ELSE id_category END
     WHERE
-        id_user = (SELECT id FROM tc_user u WHERE u.name = $4)
+        id_user = (SELECT id FROM tc_user u WHERE u.name = @username)
         RETURNING *
     )
 SELECT
-    u.avatar as user_avatar,
+    ls.id AS livestream_id,
+    updated.title AS title,
+    u.avatar AS user_avatar,
     u.name AS user_name,
     c.link AS category_link,
     c.name AS category_name
 FROM
     updated
 JOIN
-    tc_user u ON updated.id_user = u.id
+    tc_user u
+ON
+    updated.id_user = u.id
 JOIN
-    tc_category c ON updated.id_category = c.id;
+    tc_livestream ls
+ON
+    ls.id_user = ls.id
+JOIN
+    tc_category c
+ON
+    updated.id_category = c.id;
 
 
 -- name: LivestreamInsert :one
@@ -47,9 +56,13 @@ SELECT
 FROM
     inserted
 JOIN
-    tc_user u ON inserted.id_user = u.id
+    tc_user u
+ON
+    inserted.id_user = u.id
 JOIN
-    tc_category c ON inserted.id_category = c.id;
+    tc_category c
+ON
+    inserted.id_category = c.id;
 
 
 -- name: LivestreamDelete :exec

@@ -7,8 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"main/internal/lib/sl"
-	"main/pkg/api/streamserver"
-	"main/pkg/util"
+	"main/pkg/api/model/streamserver"
 	"math/rand"
 	"net/http"
 	"os"
@@ -103,8 +102,9 @@ func (u *StreamServerAdapter) Update(ctx context.Context, timeout time.Duration)
 				return
 			}
 
-			root := util.GetProjectRoot()
-			entries, err := os.ReadDir(root + "/static/livestreamthumbs")
+			// root := util.GetProjectRoot()
+			// entries, err := os.ReadDir(root + "/static/livestreamthumbs")
+			entries, err := os.ReadDir("./static/livestreamthumbs")
 			if err != nil {
 				u.log.Error("Unable to read ./static/livestreamthumbs. Cancelling updates for livestreams.", sl.Err(err))
 				return
@@ -115,12 +115,13 @@ func (u *StreamServerAdapter) Update(ctx context.Context, timeout time.Duration)
 			// also currently stream server is not serving livestream thumbs
 			// but it should (apparently) !!
 			for _, st := range resp.Streams {
-				_, err := u.lsr.Create(ctx, LivestreamCreate{CategoryLink: "apex",
+				_, err := u.lsr.Create(ctx, LivestreamCreate{
+					Category: "apex",
 					Title:    fmt.Sprintf("livestream of %s", st.Name),
 					Username: st.Name,
 				})
 				if err != nil {
-					u.log.Error("error", sl.Err(err), slog.String("user", st.Name))
+					// u.log.Error("error", sl.Err(err), sl.Op("stream server update"), slog.String("user", st.Name))
 
 					// if err != nil {
 					// 	fmt.Println("--------------------------------")

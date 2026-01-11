@@ -3,7 +3,6 @@ package setup
 import (
 	"fmt"
 	"log"
-	"main/pkg/util"
 	"math"
 	"math/rand/v2"
 	"os"
@@ -98,9 +97,10 @@ type setupUser struct {
 }
 
 func usersGet(count int) []setupUser {
-	root := util.GetProjectRoot()
+	// root := util.GetProjectRoot()
 
-	entries, err := os.ReadDir(root + "/static/avatars")
+	// entries, err := os.ReadDir(root + "/static/avatars")
+	entries, err := os.ReadDir("./static/avatars")
 	if err != nil {
 		log.Print("couldn't load avatars")
 	}

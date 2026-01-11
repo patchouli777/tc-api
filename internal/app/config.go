@@ -2,7 +2,6 @@ package app
 
 import (
 	"log"
-	"main/pkg/util"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,8 +29,9 @@ type Config struct {
 func GetConfig() Config {
 	var cfg Config
 
-	root := util.GetProjectRoot()
-	err := cleanenv.ReadConfig(root+"\\.env", &cfg)
+	// root := util.GetProjectRoot()
+	// err := cleanenv.ReadConfig(root+"\\.env", &cfg)
+	err := cleanenv.ReadConfig(".env", &cfg)
 	if err != nil {
 		log.Fatalf("config big bad: %v", err)
 	}

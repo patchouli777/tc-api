@@ -7,7 +7,6 @@ import (
 	"main/internal/db"
 	"strconv"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -41,6 +40,10 @@ func (r *RepositoryImpl) GetById(ctx context.Context, id int) (*Category, error)
 	idStr := strconv.Itoa(id)
 	category, err := r.categories.get(ctx, idStr)
 	if err != nil {
+		if err == redis.Nil {
+			return nil, errNotFound
+		}
+
 		return nil, err
 	}
 
@@ -77,10 +80,26 @@ func (r *RepositoryImpl) List(ctx context.Context, f CategoryFilter) ([]Category
 		return nil, err
 	}
 
+	// tx := r.rdb.TxPipeline()
+
+	// ids, err := r.sorted.getTx(ctx, tx, start, count)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error getting list of categories: %w", err)
+	// }
+
+	// categories, err := r.categories.list(ctx, tx, ids)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// _, err = tx.Exec(ctx)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("transaction failed: %w", err)
+	// }
+
 	return categories, nil
 }
 
-// TODO: tags
 func (r *RepositoryImpl) Create(ctx context.Context, cat CategoryCreate) error {
 	conn, err := r.pool.Acquire(ctx)
 	if err != nil {
@@ -89,10 +108,18 @@ func (r *RepositoryImpl) Create(ctx context.Context, cat CategoryCreate) error {
 	defer conn.Release()
 
 	q := QueriesAdapter{queries: db.New(conn)}
-	inserted, err := q.Insert(ctx, db.CategoryInsertParams{
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := q.queries.WithTx(tx)
+
+	category, err := qtx.CategoryInsert(ctx, db.CategoryInsertParams{
 		Name:  cat.Name,
 		Link:  cat.Link,
-		Image: pgtype.Text{String: cat.Thumbnail, Valid: true},
+		Image: cat.Thumbnail,
 	})
 	if err != nil {
 		if errors.Is(err, db.ErrDuplicateKey) {
@@ -102,17 +129,33 @@ func (r *RepositoryImpl) Create(ctx context.Context, cat CategoryCreate) error {
 		return fmt.Errorf("error creating category: %w", err)
 	}
 
-	category := Category{
-		Id:        inserted.ID,
-		IsSafe:    inserted.IsSafe.Bool,
-		Thumbnail: inserted.Image.String,
-		Name:      inserted.Name,
-		Link:      inserted.Link,
-		Viewers:   inserted.Viewers,
-		Tags:      []string{},
+	addedTags, err := qtx.CategoryAddTags(ctx, db.CategoryAddTagsParams{
+		Column1: category.ID,
+		Column2: cat.Tags,
+	})
+	if err != nil {
+		return err
 	}
 
-	err = r.addCategory(ctx, category)
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
+	}
+
+	tags := make([]CategoryTag, len(addedTags))
+	for i, t := range addedTags {
+		tags[i] = CategoryTag{Id: t.TagID, Name: t.TagName}
+	}
+
+	err = r.addCategory(ctx, Category{
+		Id:        category.ID,
+		IsSafe:    category.IsSafe,
+		Thumbnail: category.Image,
+		Name:      category.Name,
+		Link:      category.Link,
+		Viewers:   0,
+		Tags:      tags,
+	})
 	if err != nil {
 		return err
 	}
@@ -122,7 +165,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, cat CategoryCreate) error {
 
 func (r *RepositoryImpl) UpdateViewersById(ctx context.Context, id int, viewers int) error {
 	idStr := strconv.Itoa(id)
-	err := r.categories.update(ctx, idStr, viewers)
+	err := r.categories.updateViewers(ctx, idStr, viewers)
 	if err != nil {
 		return err
 	}
@@ -136,7 +179,7 @@ func (r *RepositoryImpl) UpdateViewersByLink(ctx context.Context, link string, v
 		return err
 	}
 
-	err = r.categories.update(ctx, idStr, viewers)
+	err = r.categories.updateViewers(ctx, idStr, viewers)
 	if err != nil {
 		return err
 	}
@@ -144,82 +187,174 @@ func (r *RepositoryImpl) UpdateViewersByLink(ctx context.Context, link string, v
 	return nil
 }
 
-func (r *RepositoryImpl) UpdateById(ctx context.Context, id int, cat CategoryUpdate) error {
+func (r *RepositoryImpl) UpdateById(ctx context.Context, id int32, cat CategoryUpdate) error {
 	return errors.New("not implemented")
 }
 
-// TODO: better update (pipeline)
+// TODO: rollback redis transaction =)
+// TODO: maybe its better to search by link in postgres?
 func (r *RepositoryImpl) UpdateByLink(ctx context.Context, link string, upd CategoryUpdate) error {
-	cur, err := r.GetByLink(ctx, link)
+	id, err := r.linkMap.get(ctx, link)
 	if err != nil {
 		return err
 	}
 
-	if upd.IsSafe != nil {
-		cur.IsSafe = *upd.IsSafe
-	}
-
-	if upd.Thumbnail != nil {
-		cur.Thumbnail = *upd.Thumbnail
-	}
-
-	if upd.Name != nil {
-		cur.Name = *upd.Name
-	}
-
-	if upd.Link != nil {
-		cur.Link = *upd.Link
-	}
-
-	if upd.Viewers != nil {
-		cur.Viewers = *upd.Viewers
-	}
-
-	if upd.Tags != nil {
-		cur.Tags = *upd.Tags
-	}
-
-	if err = r.categories.add(ctx, *cur); err != nil {
-		return err
-	}
-
-	if err = r.sorted.add(ctx, int(cur.Viewers), strconv.Itoa(int(cur.Id))); err != nil {
+	idInt, err := strconv.Atoi(id)
+	if err != nil {
 		return err
 	}
 
 	conn, err := r.pool.Acquire(ctx)
 	if err != nil {
-		return fmt.Errorf("error acquiring connection: %v", err)
+		return fmt.Errorf("error acquiring connection: %w", err)
 	}
 	defer conn.Release()
 
-	// q := QueriesAdapter{Q: db.New(conn)}
+	q := QueriesAdapter{queries: db.New(conn)}
+	err = q.Update(ctx, db.CategoryUpdateParams{
+		ID:           int32(idInt),
+		NameDoUpdate: upd.Name.Explicit,
+		Name:         upd.Name.Value,
+
+		LinkDoUpdate: upd.Link.Explicit,
+		Link:         upd.Link.Value,
+
+		ImageDoUpdate: upd.Thumbnail.Explicit,
+		Image:         upd.Thumbnail.Value,
+
+		IsSafeDoUpdate: upd.IsSafe.Explicit,
+		IsSafe:         upd.IsSafe.Value,
+	})
+	if err != nil {
+		return err
+	}
+
+	if upd.Tags.Explicit {
+		int32Ids := make([]int32, len(upd.Tags.Value))
+
+		for i, v := range upd.Tags.Value {
+			int32Ids[i] = int32(v)
+		}
+
+		tx, err := conn.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
+
+		qtx := q.queries.WithTx(tx)
+		err = qtx.CategoryDeleteTags(ctx, int32(idInt))
+		if err != nil {
+			return err
+		}
+
+		_, err = qtx.CategoryAddTags(ctx, db.CategoryAddTagsParams{
+			Column1: int32(idInt),
+			Column2: int32Ids,
+		})
+		if err != nil {
+			return err
+		}
+
+		tx.Commit(ctx)
+	}
+
+	tx := r.rdb.TxPipeline()
+
+	if upd.Link.Explicit {
+		r.categories.updateFieldTx(ctx, tx, id, "link", upd.Link.Value)
+	}
+
+	if upd.IsSafe.Explicit {
+		r.categories.updateFieldTx(ctx, tx, id, "is_safe", upd.IsSafe.Value)
+	}
+
+	if upd.Name.Explicit {
+		r.categories.updateFieldTx(ctx, tx, id, "name", upd.Name.Value)
+	}
+
+	if upd.Thumbnail.Explicit {
+		r.categories.updateFieldTx(ctx, tx, id, "thumbnail", upd.Thumbnail.Value)
+	}
+
+	if upd.Tags.Explicit {
+		r.categories.updateFieldTx(ctx, tx, id, "tags", upd.Tags)
+	}
+
+	_, err = tx.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("transaction failed: %w", err)
+	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) DeleteById(ctx context.Context, id int) error {
-	return errors.New("not implemented")
+func (r *RepositoryImpl) DeleteById(ctx context.Context, id int32) error {
+	conn, err := r.pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("error acquiring connection: %w", err)
+	}
+	defer conn.Release()
+
+	q := QueriesAdapter{queries: db.New(conn)}
+	err = q.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	idString := strconv.FormatInt(int64(id), 10)
+
+	tx := r.rdb.TxPipeline()
+
+	err = r.categories.deleteTx(ctx, tx, idString)
+	if err != nil {
+		return err
+	}
+
+	err = r.sorted.deleteTx(ctx, tx, idString)
+	if err != nil {
+		return err
+	}
+
+	err = r.linkMap.deleteTx(ctx, tx, idString)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("transaction execution failed: %w", err)
+	}
+
+	return nil
 }
 
 func (r *RepositoryImpl) DeleteByLink(ctx context.Context, link string) error {
 	return errors.New("not implemented")
 }
 
+// TODO: rollback
 func (r *RepositoryImpl) addCategory(ctx context.Context, cat Category) error {
-	err := r.categories.add(ctx, cat)
+	tx := r.rdb.TxPipeline()
+
+	err := r.categories.addTx(ctx, tx, cat)
 	if err != nil {
 		return err
 	}
 
-	err = r.sorted.add(ctx, int(cat.Viewers), strconv.Itoa(int(cat.Id)))
+	err = r.sorted.addTx(ctx, tx, int(cat.Viewers), strconv.Itoa(int(cat.Id)))
 	if err != nil {
 		return err
 	}
 
-	err = r.linkMap.add(ctx, cat.Link, int(cat.Id))
+	err = r.linkMap.addTx(ctx, tx, cat.Link, int(cat.Id))
 	if err != nil {
 		return err
+	}
+
+	_, err = tx.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("transaction execution failed: %w", err)
 	}
 
 	return nil

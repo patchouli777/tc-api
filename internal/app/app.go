@@ -44,9 +44,9 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 		return nil
 	}
 
-	grpcClient, err := NewGRPClient(log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
+	authClient, err := NewAuthClient(log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
 	if err != nil {
-		log.Error("unable to initialize grpc client", sl.Err(err))
+		log.Error("unable to initialize auth client", sl.Err(err))
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 		log,
 		cfg.InstanceID.String(),
 		cfg.Env,
-		grpcClient,
+		authClient,
 		rdb,
 		pool)
 	srvcs.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
@@ -89,7 +89,7 @@ func CreateHandler(ctx context.Context, log *slog.Logger, cfg Config, srvcs App)
 
 type App struct {
 	Auth                *auth.ServiceImpl
-	Livestream          *livestream.ServiceImpl
+	Livestream          *livestream.RepositoryImpl
 	StreamServerAdapter *livestream.StreamServerAdapter
 	Category            *category.RepositoryImpl
 	CategoryUpdater     *category.CategoryUpdater
@@ -102,12 +102,12 @@ func InitApp(ctx context.Context,
 	log *slog.Logger,
 	instanceID string,
 	env string,
-	grpcClient auth.GRPCCLient,
+	client auth.Client,
 	rdb *redis.Client,
 	pool *pgxpool.Pool) App {
 	livestreamRepo := livestream.NewRepo(rdb, pool)
 	streamServerAdapter := livestream.NewStreamServerAdapter(log, livestreamRepo, instanceID)
-	livestreamsService := livestream.NewService(livestreamRepo)
+	// livestreamsService := livestream.NewService(livestreamRepo)
 
 	channelDBAdapter := channel.NewAdapter(pool)
 	channelService := channel.NewService(log, channelDBAdapter)
@@ -116,7 +116,7 @@ func InitApp(ctx context.Context,
 	categoryUpdater := category.NewUpdater(log, livestreamRepo, categoryRepo)
 
 	authDBAdapter := auth.NewAdapter(pool)
-	authService := auth.NewService(grpcClient, authDBAdapter)
+	authService := auth.NewService(client, authDBAdapter)
 
 	followService := follow.NewService(pool)
 
@@ -124,8 +124,9 @@ func InitApp(ctx context.Context,
 	userService := user.NewService(userRepo)
 
 	return App{
+		// Livestream:          livestreamsService,
 		Auth:                authService,
-		Livestream:          livestreamsService,
+		Livestream:          livestreamRepo,
 		Channel:             channelService,
 		Category:            categoryRepo,
 		CategoryUpdater:     categoryUpdater,
@@ -134,9 +135,9 @@ func InitApp(ctx context.Context,
 		StreamServerAdapter: streamServerAdapter}
 }
 
-func NewGRPClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfig) (auth.GRPCCLient, error) {
+func NewAuthClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfig) (auth.Client, error) {
 	if env == envProd {
-		return auth.NewGRPClient(log,
+		return auth.NewAuthClient(log,
 			cfg.Host,
 			cfg.Port,
 			cfg.Timeout,
@@ -145,7 +146,7 @@ func NewGRPClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfi
 
 	if !isMock {
 		log.Info("Initializating real grpc client because AUTH_SERVICE_MOCK == false")
-		return auth.NewGRPClient(log,
+		return auth.NewAuthClient(log,
 			cfg.Host,
 			cfg.Port,
 			cfg.Timeout,
@@ -153,7 +154,7 @@ func NewGRPClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfi
 	}
 
 	log.Info("ENV is not prod and AUTH_SERVICE_MOCK is not false. Initializing mock grpc client.")
-	return &auth.GRPCClientMock{}, nil
+	return &auth.AuthClientMock{}, nil
 }
 
 func NewLogger(cfg LoggerConfig) *slog.Logger {

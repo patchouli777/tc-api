@@ -43,7 +43,7 @@ WITH inserted AS (
         FALSE,
         $3
     )
-    RETURNING id, id_user, id_category, viewers, title, is_live, started_at, is_multistream
+    RETURNING id, id_user, id_category, viewers, title, started_at, is_multistream
 )
 SELECT
     inserted.id AS livestream_id,
@@ -55,15 +55,19 @@ SELECT
 FROM
     inserted
 JOIN
-    tc_user u ON inserted.id_user = u.id
+    tc_user u
+ON
+    inserted.id_user = u.id
 JOIN
-    tc_category c ON inserted.id_category = c.id
+    tc_category c
+ON
+    inserted.id_category = c.id
 `
 
 type LivestreamInsertParams struct {
 	Name  string
 	Link  string
-	Title pgtype.Text
+	Title string
 }
 
 type LivestreamInsertRow struct {
@@ -93,34 +97,46 @@ const livestreamUpdate = `-- name: LivestreamUpdate :one
 WITH updated AS (
     UPDATE tc_livestream
     SET
-        title = $1,
-        viewers = $2,
-        id_category = (SELECT id FROM tc_category c WHERE c.link = $3)
+        title = CASE WHEN $1::boolean THEN $2 ELSE title END,
+        id_category = CASE WHEN $3::boolean THEN $4 ELSE id_category END
     WHERE
-        id_user = (SELECT id FROM tc_user u WHERE u.name = $4)
-        RETURNING id, id_user, id_category, viewers, title, is_live, started_at, is_multistream
+        id_user = (SELECT id FROM tc_user u WHERE u.name = $5)
+        RETURNING id, id_user, id_category, viewers, title, started_at, is_multistream
     )
 SELECT
-    u.avatar as user_avatar,
+    ls.id AS livestream_id,
+    updated.title AS title,
+    u.avatar AS user_avatar,
     u.name AS user_name,
     c.link AS category_link,
     c.name AS category_name
 FROM
     updated
 JOIN
-    tc_user u ON updated.id_user = u.id
+    tc_user u
+ON
+    updated.id_user = u.id
 JOIN
-    tc_category c ON updated.id_category = c.id
+    tc_livestream ls
+ON
+    ls.id_user = ls.id
+JOIN
+    tc_category c
+ON
+    updated.id_category = c.id
 `
 
 type LivestreamUpdateParams struct {
-	Title   pgtype.Text
-	Viewers int32
-	Link    string
-	Name    string
+	TitleDoUpdate      pgtype.Bool
+	Title              pgtype.Text
+	IDCategoryDoUpdate pgtype.Bool
+	IDCategory         pgtype.Int4
+	Username           pgtype.Text
 }
 
 type LivestreamUpdateRow struct {
+	LivestreamID int32
+	Title        string
 	UserAvatar   pgtype.Text
 	UserName     string
 	CategoryLink string
@@ -129,13 +145,16 @@ type LivestreamUpdateRow struct {
 
 func (q *Queries) LivestreamUpdate(ctx context.Context, arg LivestreamUpdateParams) (LivestreamUpdateRow, error) {
 	row := q.db.QueryRow(ctx, livestreamUpdate,
+		arg.TitleDoUpdate,
 		arg.Title,
-		arg.Viewers,
-		arg.Link,
-		arg.Name,
+		arg.IDCategoryDoUpdate,
+		arg.IDCategory,
+		arg.Username,
 	)
 	var i LivestreamUpdateRow
 	err := row.Scan(
+		&i.LivestreamID,
+		&i.Title,
 		&i.UserAvatar,
 		&i.UserName,
 		&i.CategoryLink,

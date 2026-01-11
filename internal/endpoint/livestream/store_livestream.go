@@ -19,20 +19,20 @@ type livestreamStore struct {
 	rdb *redis.Client
 }
 
-func (r *livestreamStore) Add(ctx context.Context, ls Livestream) *redis.IntCmd {
-	return r.rdb.HSet(ctx, r.Key(strconv.Itoa(int(ls.Id))), ls)
+func (r *livestreamStore) add(ctx context.Context, ls Livestream) *redis.IntCmd {
+	return r.rdb.HSet(ctx, r.key(strconv.Itoa(int(ls.Id))), ls)
 }
 
-func (r *livestreamStore) TxAdd(ctx context.Context, tx redis.Pipeliner, ls Livestream) *redis.IntCmd {
-	return tx.HSet(ctx, r.Key(strconv.Itoa(int(ls.Id))), ls)
+func (r *livestreamStore) addTx(ctx context.Context, tx redis.Pipeliner, ls Livestream) *redis.IntCmd {
+	return tx.HSet(ctx, r.key(strconv.Itoa(int(ls.Id))), ls)
 }
 
-func (r *livestreamStore) List(ctx context.Context, ids []string) ([]Livestream, error) {
+func (r *livestreamStore) list(ctx context.Context, ids []string) ([]Livestream, error) {
 	pipe := r.rdb.Pipeline()
 	cmds := make([]*redis.MapStringStringCmd, len(ids))
 
 	for i, id := range ids {
-		cmds[i] = pipe.HGetAll(ctx, r.Key(id))
+		cmds[i] = pipe.HGetAll(ctx, r.key(id))
 	}
 
 	_, err := pipe.Exec(ctx)
@@ -63,8 +63,43 @@ func (r *livestreamStore) List(ctx context.Context, ids []string) ([]Livestream,
 	return livestreams, nil
 }
 
-func (r *livestreamStore) Get(ctx context.Context, lsId string) (*Livestream, error) {
-	res, err := r.rdb.HGetAll(ctx, r.Key(lsId)).Result()
+func (r *livestreamStore) listTx(ctx context.Context, tx redis.Pipeliner, ids []string) ([]Livestream, error) {
+	cmds := make([]*redis.MapStringStringCmd, len(ids))
+
+	for i, id := range ids {
+		cmds[i] = tx.HGetAll(ctx, r.key(id))
+	}
+
+	_, err := tx.Exec(ctx)
+	if err != nil && err != redis.Nil {
+		return nil, err
+	}
+
+	livestreams := make([]Livestream, len(ids))
+	for i, cmd := range cmds {
+		val, err := cmd.Result()
+		if err != nil {
+			if err == redis.Nil {
+				slog.Error("inconsistent state: livestream id is present in sorted set, but livestream is not present in livestream store")
+				continue
+			}
+
+			slog.Error("transaction failed", sl.Err(err))
+			continue
+		}
+
+		ls, err := r.deserealize(val)
+		if err != nil {
+			return nil, err
+		}
+		livestreams[i] = *ls
+	}
+
+	return livestreams, nil
+}
+
+func (r *livestreamStore) get(ctx context.Context, lsId string) (*Livestream, error) {
+	res, err := r.rdb.HGetAll(ctx, r.key(lsId)).Result()
 
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
@@ -77,12 +112,30 @@ func (r *livestreamStore) Get(ctx context.Context, lsId string) (*Livestream, er
 	return r.deserealize(res)
 }
 
-func (r *livestreamStore) UpdateViewers(ctx context.Context, lsId string, viewers int) error {
-	return r.rdb.HSet(ctx, r.Key(lsId), "viewers", viewers).Err()
+func (r *livestreamStore) getTx(ctx context.Context, tx redis.Pipeliner, lsId string) (*Livestream, error) {
+	res, err := tx.HGetAll(ctx, r.key(lsId)).Result()
+
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, errNotFound
+		}
+
+		return nil, err
+	}
+
+	return r.deserealize(res)
 }
 
-func (r *livestreamStore) UpdateThumbnail(ctx context.Context, lsId, thumbnail string) error {
-	return r.rdb.HSet(ctx, r.Key(lsId), "thumbnail", thumbnail).Err()
+func (r *livestreamStore) updateViewers(ctx context.Context, lsId string, viewers int) error {
+	return r.rdb.HSet(ctx, r.key(lsId), "viewers", viewers).Err()
+}
+
+func (r *livestreamStore) updateFieldTx(ctx context.Context, tx redis.Pipeliner, id string, values map[string]any) error {
+	return tx.HSet(ctx, r.key(id), values).Err()
+}
+
+func (r *livestreamStore) updateThumbnail(ctx context.Context, lsId, thumbnail string) error {
+	return r.rdb.HSet(ctx, r.key(lsId), "thumbnail", thumbnail).Err()
 }
 
 func (r *livestreamStore) deserealize(re map[string]string) (*Livestream, error) {
@@ -125,14 +178,14 @@ func (r *livestreamStore) deserealize(re map[string]string) (*Livestream, error)
 	return &ls, nil
 }
 
-func (r *livestreamStore) Key(id string) string {
+func (r *livestreamStore) key(id string) string {
 	return fmt.Sprintf("livestreams:%s", id)
 }
 
-func (r *livestreamStore) Delete(ctx context.Context, lsId string) *redis.IntCmd {
-	return r.rdb.Del(ctx, r.Key(lsId))
+func (r *livestreamStore) delete(ctx context.Context, lsId string) *redis.IntCmd {
+	return r.rdb.Del(ctx, r.key(lsId))
 }
 
-func (r *livestreamStore) TxDelete(ctx context.Context, tx redis.Pipeliner, lsId string) *redis.IntCmd {
-	return tx.Del(ctx, r.Key(lsId))
+func (r *livestreamStore) deleteTx(ctx context.Context, tx redis.Pipeliner, lsId string) *redis.IntCmd {
+	return tx.Del(ctx, r.key(lsId))
 }

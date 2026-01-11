@@ -2,11 +2,8 @@ package livestream
 
 import (
 	"errors"
-	"log/slog"
-	"main/internal/lib/sl"
-	"main/pkg/client"
+	"main/pkg/api/client"
 	"net/http"
-	"os"
 )
 
 type StreamServerClient struct {
@@ -17,7 +14,6 @@ type StreamServerClient struct {
 func NewStreamServerClient() *StreamServerClient {
 	return &StreamServerClient{
 		base: &client.BaseClient{
-			Log:    slog.New(slog.NewTextHandler(os.Stdout, nil)),
 			Client: &http.Client{},
 		},
 		BaseURL: "http://localhost:1985/api/v1/streams"}
@@ -30,7 +26,6 @@ func (c *StreamServerClient) Start(username string) (*http.Response, error) {
 
 	req, err := c.base.Post(c.BaseURL, Data{Channel: username})
 	if err != nil {
-		c.base.Log.Error("unable to create post request", sl.Err(err))
 		return nil, err
 	}
 	defer req.Body.Close() // nolint
@@ -41,7 +36,6 @@ func (c *StreamServerClient) Start(username string) (*http.Response, error) {
 func (c *StreamServerClient) Stop(username string) (*http.Response, error) {
 	req, err := c.base.Delete(c.BaseURL+username, nil)
 	if err != nil {
-		c.base.Log.Error("unable to create delete request", sl.Err(err))
 		return nil, err
 	}
 	defer req.Body.Close() // nolint

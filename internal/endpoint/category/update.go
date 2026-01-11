@@ -54,8 +54,6 @@ func (cu *CategoryUpdater) Update(ctx context.Context, timeout time.Duration) {
 
 					var viewers int32 = 0
 
-					// NOTE: для обновления категории беруется первые по зрителям 100 трансляций
-					// (или меньше если их всего меньше 100)
 					for i := range int(math.Min(100, float64(len(lsArr)))) {
 						viewers += lsArr[i].Viewers
 					}
@@ -75,7 +73,6 @@ func (cu *CategoryUpdater) Update(ctx context.Context, timeout time.Duration) {
 				return
 			case <-time.After(timeout):
 				cancelTimeout()
-				cu.log.Info("category updating started")
 			}
 		}
 	}()
