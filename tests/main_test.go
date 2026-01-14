@@ -99,7 +99,9 @@ func TestMain(m *testing.M) {
 	// srvcs.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
 	// srvcs.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
 
-	handler := app.CreateHandler(ctx, log, cfg, srvcs)
+	authMw := app.NewAuthMiddleware(log, false)
+
+	handler := app.CreateHandler(ctx, log, authMw, srvcs)
 	ts = httptest.NewServer(handler)
 	defer ts.Close()
 

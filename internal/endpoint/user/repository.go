@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"fmt"
 	"main/internal/db"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -17,23 +18,16 @@ func NewRepository(pool *pgxpool.Pool) *RepositoryImpl {
 	return &RepositoryImpl{pool: pool}
 }
 
-func (r *RepositoryImpl) Get(ctx context.Context, username string) (*User, error) {
-	conn, err := r.pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Release()
+func (r *RepositoryImpl) Get(ctx context.Context, id int32) (*User, error) {
+	q := QueriesAdapter{queries: db.New(r.pool)}
 
-	queries := db.New(conn)
-	q := NewDBAdapter(queries)
-
-	// TODO: sentinel
-	res, err := q.SelectByUsername(ctx, username)
+	res, err := q.Select(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	return &User{Id: int(res.ID),
+	return &User{
+		Id:              res.ID,
 		Name:            res.Name,
 		IsBanned:        res.IsBanned.Bool,
 		IsPartner:       res.IsPartner.Bool,
@@ -43,52 +37,52 @@ func (r *RepositoryImpl) Get(ctx context.Context, username string) (*User, error
 }
 
 func (r *RepositoryImpl) Create(ctx context.Context, u UserCreate) error {
-	conn, err := r.pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
+	q := QueriesAdapter{queries: db.New(r.pool)}
 
-	queries := db.New(conn)
-	q := NewDBAdapter(queries)
-
-	_, err = q.Insert(ctx, db.UserInsertParams{Name: u.Name,
+	err := q.Insert(ctx, db.UserInsertParams{Name: u.Name,
 		Password: u.Password,
 		Avatar:   pgtype.Text{String: u.Avatar, Valid: true}})
 
 	return err
 }
 
-// TODO: impl
-func (r *RepositoryImpl) Update(ctx context.Context, u UserUpdate) error {
-	conn, err := r.pool.Acquire(ctx)
+func (r *RepositoryImpl) Update(ctx context.Context, id int32, upd UserUpdate) error {
+	q := QueriesAdapter{queries: db.New(r.pool)}
+
+	err := q.Update(ctx, db.UserUpdateParams{
+		ID: id,
+
+		NameDoUpdate: upd.Name.Explicit && !upd.Name.IsNull,
+		Name:         upd.Name.Value,
+
+		PasswordDoUpdate: upd.Password.Explicit && !upd.Password.IsNull,
+		Password:         upd.Password.Value,
+
+		IsBannedDoUpdate: upd.IsBanned.Explicit && !upd.IsBanned.IsNull,
+		IsBanned:         pgtype.Bool{Bool: upd.IsBanned.Value, Valid: true},
+
+		IsPartnerDoUpdate: upd.IsPartner.Explicit && !upd.IsPartner.IsNull,
+		IsPartner:         pgtype.Bool{Bool: upd.IsPartner.Value, Valid: true},
+
+		AvatarDoUpdate: upd.Avatar.Explicit && !upd.Avatar.IsNull,
+		Avatar:         pgtype.Text{String: upd.Avatar.Value, Valid: upd.Avatar.IsNull},
+	})
+
 	if err != nil {
+		fmt.Println(err)
+
 		return err
 	}
-	defer conn.Release()
 
-	return errors.New("not implemented")
+	return nil
 }
 
-func (r *RepositoryImpl) Delete(ctx context.Context, id int) error {
-	conn, err := r.pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
+func (r *RepositoryImpl) Delete(ctx context.Context, id int32) error {
+	q := QueriesAdapter{queries: db.New(r.pool)}
 
-	queries := db.New(conn)
-	q := NewDBAdapter(queries)
-
-	return q.Delete(ctx, int32(id))
+	return q.Delete(ctx, id)
 }
 
 func (r *RepositoryImpl) List(ctx context.Context, ul UserList) ([]User, error) {
-	conn, err := r.pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Release()
-
 	return nil, errors.New("not implemented")
 }

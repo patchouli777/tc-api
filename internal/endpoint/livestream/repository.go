@@ -21,10 +21,8 @@ type RepositoryImpl struct {
 }
 
 func NewRepo(rdb *redis.Client, pool *pgxpool.Pool) *RepositoryImpl {
-	cache := newCache(rdb)
-
 	return &RepositoryImpl{
-		cache: cache,
+		cache: newCache(rdb),
 		pool:  pool,
 	}
 }
@@ -52,13 +50,8 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 		return nil, err
 	}
 
-	conn, err := r.pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Release()
+	q := QueriesAdapter{queries: db.New(r.pool)}
 
-	q := QueriesAdapter{queries: db.New(conn)}
 	ins, err := q.Insert(ctx, db.LivestreamInsertParams{
 		Name:  cr.Username,
 		Link:  cr.Category,
@@ -69,19 +62,13 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 	}
 
 	ls := Livestream{
-		Id:        ins.LivestreamID,
-		Title:     cr.Title,
-		StartedAt: int64(ins.StartedAt.Time.Second()),
-		User: User{
-			Name:   ins.UserName,
-			Avatar: ins.UserAvatar.String,
-		},
-		Category: Category{
-			Name: ins.CategoryName,
-			Link: ins.CategoryLink,
-		},
-		Viewers:   0,
-		Thumbnail: "", // we don't have frames for thumbnail upon creation
+		Id:           ins.LivestreamID,
+		Title:        cr.Title,
+		StartedAt:    int64(ins.StartedAt.Time.Second()),
+		UserName:     ins.UserName,
+		UserAvatar:   ins.UserAvatar.String,
+		CategoryName: ins.CategoryName,
+		CategoryLink: ins.CategoryLink,
 	}
 
 	// TODO: insert success into cache failure -> big bad
@@ -94,19 +81,11 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 }
 
 func (r *RepositoryImpl) UpdateViewers(ctx context.Context, user string, viewers int32) error {
-	// NOTE: viewers count is not that important in postgres since it is used only in follow list
-	// so we can fire an update query and forget about it
-	// TODO: cleanup + handle errors properly (possibly)
+	// TODO: batch updates
 	go func() {
-		conn, err := r.pool.Acquire(ctx)
-		if err != nil {
-			slog.Error("unable to acquire connection while updating viewers", sl.Err(err))
-			return
-		}
-		defer conn.Release()
+		q := QueriesAdapter{queries: db.New(r.pool)}
 
-		q := QueriesAdapter{queries: db.New(conn)}
-		err = q.UpdateViewers(ctx, db.LivestreamUpdateViewersParams{
+		err := q.UpdateViewers(ctx, db.LivestreamUpdateViewersParams{
 			Viewers: viewers,
 			Name:    user,
 		})
@@ -119,13 +98,7 @@ func (r *RepositoryImpl) UpdateViewers(ctx context.Context, user string, viewers
 }
 
 func (r *RepositoryImpl) Update(ctx context.Context, channel string, upd LivestreamUpdate) (*Livestream, error) {
-	conn, err := r.pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Release()
-
-	q := QueriesAdapter{queries: db.New(conn)}
+	q := QueriesAdapter{queries: db.New(r.pool)}
 	// NOTE: for some reason sqlc generates types like that
 	// TODO: fix someday?
 	// TODO: pass user id and not username because username can be changed in realtime
@@ -177,12 +150,6 @@ func (r *RepositoryImpl) Delete(ctx context.Context, username string) error {
 		return err
 	}
 
-	conn, err := r.pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
-
-	q := QueriesAdapter{queries: db.New(conn)}
+	q := QueriesAdapter{queries: db.New(r.pool)}
 	return q.Delete(ctx, username)
 }

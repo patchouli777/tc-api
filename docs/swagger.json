@@ -1,10 +1,18 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "yes",
-        "title": "twitchclone api",
-        "termsOfService": "no",
-        "contact": {},
+        "description": "desc",
+        "title": "Swagger Example API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
         "version": "1.0"
     },
     "host": "localhost:8090",
@@ -12,7 +20,7 @@
     "paths": {
         "/categories": {
             "get": {
-                "description": "Retrieves a list of categories with optional pagination and sorting parameters",
+                "description": "Retrieve a paginated list of categories with optional sorting",
                 "consumes": [
                     "application/json"
                 ],
@@ -20,59 +28,57 @@
                     "application/json"
                 ],
                 "tags": [
-                    "category"
+                    "Categories"
                 ],
-                "summary": "List categories with pagination and sorting",
+                "summary": "List categories",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
+                        "type": "string",
+                        "description": "Page number (default: 1)",
                         "name": "page",
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Number of items per page",
+                        "type": "string",
+                        "description": "Items per page (default: 10)",
                         "name": "count",
                         "in": "query"
                     },
                     {
-                        "enum": [
-                            "asc",
-                            "desc"
-                        ],
                         "type": "string",
-                        "default": "desc",
-                        "description": "Sort order (asc or desc)",
+                        "description": "Sort order (asc, desc) (default: desc)",
                         "name": "sort",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of categories",
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/category.ListResponse"
+                            "$ref": "#/definitions/main_pkg_api_category.ListResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid query parameter",
+                        "description": "Invalid page, count, or sort parameter",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal server error while fetching categories",
+                        "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Creates a new category with the given details",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new category (staff only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -80,42 +86,50 @@
                     "application/json"
                 ],
                 "tags": [
-                    "category"
+                    "Categories"
                 ],
-                "summary": "Add a new category",
+                "summary": "Create new category",
                 "parameters": [
                     {
-                        "description": "Category creation request body",
+                        "type": "string",
+                        "format": "jwt",
+                        "description": "Bearer token",
+                        "name": "auth",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Category data",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/category.PostRequest"
+                            "$ref": "#/definitions/main_pkg_api_category.PostRequest"
                         }
                     }
                 ],
                 "responses": {
                     "204": {
-                        "description": "No Content - category created successfully"
+                        "description": "Category created successfully"
                     },
                     "400": {
-                        "description": "Bad Request: invalid data",
+                        "description": "Invalid auth, insufficient permissions, or malformed request",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error: failed to add category",
+                        "description": "Internal server error or category already exists",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/categories/{categoryIdentifier}": {
+        "/categories/{identifier}": {
             "get": {
-                "description": "Retrieves detailed information about a category by either its numeric ID or a unique link (slug).",
+                "description": "Retrieve a category using either its numeric ID or string link (e.g. \"path-of-exile\")",
                 "consumes": [
                     "application/json"
                 ],
@@ -123,138 +137,15 @@
                     "application/json"
                 ],
                 "tags": [
-                    "category"
+                    "Categories"
                 ],
                 "summary": "Get category by ID or link",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Category identifier (either numeric ID or unique link)",
-                        "name": "categoryIdentifier",
+                        "description": "Category ID or link",
+                        "name": "identifier",
                         "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Category found successfully",
-                        "schema": {
-                            "$ref": "#/definitions/category.GetResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Deletes a category entity identified by either its numeric ID or unique link (slug).",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "category"
-                ],
-                "summary": "Delete category by ID or link",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Category identifier (either numeric ID or unique link)",
-                        "name": "categoryIdentifier",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content - category delted successfully"
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "description": "Partially updates a category entity using provided fields, identified by either numeric ID or unique link (slug).",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "category"
-                ],
-                "summary": "Update category by ID or link",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Category identifier (either numeric ID or unique link)",
-                        "name": "categoryIdentifier",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Fields to update in the category",
-                        "name": "patchRequest",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/category.PatchRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content - category updated successfully"
-                    },
-                    "400": {
-                        "description": "Invalid request data",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    }
-                }
-            }
-        },
-        "/follow/{username}": {
-            "get": {
-                "description": "Returns json response",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "follow"
-                ],
-                "summary": "is user a follower of other user",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "follower",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "followed",
-                        "name": "followed",
-                        "in": "query",
                         "required": true
                     }
                 ],
@@ -262,74 +153,30 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/follow.GetResponse"
+                            "$ref": "#/definitions/main_pkg_api_category.GetResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "404": {
+                        "description": "Category not found",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Allows the authenticated user to follow another user by username",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "follow"
-                ],
-                "summary": "Follow a user",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username of the user to follow",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Username of the user to be followed",
-                        "name": "following",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Follow successful",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request: user mismatch",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error: failed to follow user",
+                        "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
             },
             "delete": {
-                "description": "Allows the authenticated user to unfollow another user by username",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a category by ID or link (staff only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -337,42 +184,145 @@
                     "application/json"
                 ],
                 "tags": [
-                    "follow"
+                    "Categories"
                 ],
-                "summary": "Unfollow a user",
+                "summary": "Delete category",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Username of the user to unfollow",
-                        "name": "username",
+                        "description": "Category ID or link",
+                        "name": "identifier",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Username of the user to be unfollowed",
-                        "name": "unfollowing",
-                        "in": "query",
+                        "format": "jwt",
+                        "description": "Bearer token",
+                        "name": "auth",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Category deleted successfully"
+                    },
+                    "400": {
+                        "description": "Invalid or insufficient auth permissions",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partially update a category by ID or link (staff only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Update category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID or link",
+                        "name": "identifier",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "format": "jwt",
+                        "description": "Bearer token",
+                        "name": "auth",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_category.PatchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Category updated successfully"
+                    },
+                    "400": {
+                        "description": "Invalid auth, insufficient permissions, or malformed request",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/channels/{channel}": {
+            "get": {
+                "description": "Retrieve detailed information about a specific channel",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Channels"
+                ],
+                "summary": "Get channel details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Channel identifier",
+                        "name": "channel",
+                        "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Unfollow successful",
+                        "description": "Channel details",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/main_pkg_api_channel.GetResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request: user mismatch",
+                        "description": "Missing channel identifier",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error: failed to unfollow user",
+                        "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
@@ -380,102 +330,206 @@
         },
         "/follows": {
             "get": {
-                "description": "Lists the followees of a given follower username. If `extended=true` is passed as a query parameter, returns detailed info per followee.",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Get list of users that follower is following (basic or extended)",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "follow"
+                    "Follows"
                 ],
-                "summary": "Retrieve follower's follow list",
+                "summary": "List followers or following",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Follower username whose follow list is requested",
+                        "description": "Username to get follow list for",
                         "name": "follower",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "If set to 'true', returns extended follow list details",
+                        "description": "true for extended info, false/default for basic",
                         "name": "extended",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Extended follow list response",
+                        "description": "Extended follow list",
                         "schema": {
-                            "$ref": "#/definitions/follow.ListExtendedResponse"
+                            "$ref": "#/definitions/main_pkg_api_follow.ListExtendedResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad request: follower username is missing",
+                        "description": "Missing follower parameter",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal server error while retrieving follow list",
+                        "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/livestream/{username}": {
-            "patch": {
-                "description": "Update livestream information like title and category for the authenticated user.",
-                "consumes": [
-                    "application/json"
-                ],
+        "/follows/{username}": {
+            "get": {
+                "description": "Check if one user follows another",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "livestream"
+                    "Follows"
                 ],
-                "summary": "Update livestream data",
+                "summary": "Check follow status",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Username",
+                        "description": "Follower username",
                         "name": "username",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Patch livestream request body",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/livestream.PatchRequest"
-                        }
+                        "type": "string",
+                        "description": "Followed username",
+                        "name": "followed",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful update response",
+                        "description": "Follow status",
                         "schema": {
-                            "$ref": "#/definitions/livestream.PatchResponse"
+                            "$ref": "#/definitions/main_pkg_api_follow.GetResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad request or unauthorized update attempt",
+                        "description": "Missing followed parameter",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal server error updating livestream",
+                        "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Follow a user (or unfollow if already following)",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Follows"
+                ],
+                "summary": "Follow or unfollow user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authenticated user's username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "User to follow/unfollow",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_follow.PostRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid claims or identity mismatch",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Unfollow a specific user",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Follows"
+                ],
+                "summary": "Unfollow user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authenticated user's username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "User to unfollow",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_follow.DeleteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid claims or identity mismatch",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
@@ -483,62 +537,63 @@
         },
         "/livestreams": {
             "get": {
-                "description": "Retrieves a paginated list of livestreams filtered by category or category ID.",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Get paginated list of livestreams filtered by category",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "livestream"
+                    "Livestreams"
                 ],
-                "summary": "List livestreams by category or category ID",
+                "summary": "List livestreams by category",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Category name to filter by",
+                        "description": "Category name",
                         "name": "category",
                         "in": "query"
                     },
                     {
+                        "minLength": 1,
                         "type": "string",
-                        "description": "Category ID to filter by",
+                        "description": "Category identifier",
                         "name": "categoryId",
                         "in": "query"
                     },
                     {
+                        "minimum": 1,
                         "type": "integer",
                         "default": 1,
-                        "description": "Page number for pagination (default 1)",
+                        "description": "Page number",
                         "name": "page",
                         "in": "query"
                     },
                     {
+                        "maximum": 100,
+                        "minimum": 1,
                         "type": "integer",
                         "default": 10,
-                        "description": "Number of results per page (default 10)",
+                        "description": "Items per page",
                         "name": "count",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Livestream list response",
+                        "description": "Paginated livestreams",
                         "schema": {
-                            "$ref": "#/definitions/livestream.ListResponse"
+                            "$ref": "#/definitions/main_pkg_api_livestream.ListResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad request: missing or invalid parameters",
+                        "description": "Missing category, invalid page/count",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/er.RequestError"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
@@ -546,21 +601,18 @@
         },
         "/livestreams/{username}": {
             "get": {
-                "description": "Retrieves livestream information for the specified streamer username",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Retrieve livestream information for a streamer",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "livestream"
+                    "Livestreams"
                 ],
-                "summary": "Get livestream data by username",
+                "summary": "Get livestream data",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Streamer Username",
+                        "description": "Streamer username",
                         "name": "username",
                         "in": "path",
                         "required": true
@@ -568,411 +620,21 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Livestream data",
                         "schema": {
-                            "$ref": "#/definitions/livestream.GetResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Starts a livestream if the authenticated user matches the username in the path",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "livestream"
-                ],
-                "summary": "Start a new livestream for a user",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Livestream start data",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/livestream.PostRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/livestream.PostResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Stops the livestream if the authenticated user matches the username in the path",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "livestream"
-                ],
-                "summary": "Stop a livestream for a user",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/livestream.DeleteResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/er.RequestError"
-                        }
-                    }
-                }
-            }
-        },
-        "/login": {
-            "post": {
-                "description": "Authenticate user and return access token (refresh token set as cookie)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "User login",
-                "parameters": [
-                    {
-                        "description": "Login credentials",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/auth.LoginRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Access token returned",
-                        "schema": {
-                            "$ref": "#/definitions/auth.LoginResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid credentials or request data",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/register": {
-            "post": {
-                "description": "Register new user account and return access token (refresh token set as cookie)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "User registration",
-                "parameters": [
-                    {
-                        "description": "Registration data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/auth.RegisterRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Access token returned",
-                        "schema": {
-                            "$ref": "#/definitions/auth.RegisterResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request data",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "409": {
-                        "description": "User already exists",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/users": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "List users with optional filters (staff only)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "List all users",
-                "parameters": [
-                    {
-                        "description": "List filters",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/user.ListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/user.ListResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid claims or insufficient permissions",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Create a new user account with name, password, and optional avatar",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Create new user",
-                "parameters": [
-                    {
-                        "description": "User creation data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/user.PostRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Invalid request data or missing fields",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "409": {
-                        "description": "Username already exists",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/users/{username}": {
-            "get": {
-                "description": "Retrieve user information by username",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Get user by username",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/user.GetResponse"
+                            "$ref": "#/definitions/main_pkg_api_livestream.GetResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Livestream not found",
                         "schema": {
-                            "$ref": "#/definitions/user.GetResponseNotFound"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete authenticated user's account by providing user ID in request body",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Delete user account",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "User ID to delete",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/user.DeleteRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Invalid claims, identity mismatch, or invalid request data",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
@@ -983,7 +645,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update authenticated user's profile information",
+                "description": "Update livestream title and category (owner only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -991,24 +653,171 @@
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "Livestreams"
                 ],
-                "summary": "Update user profile",
+                "summary": "Update livestream",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Username",
+                        "description": "Livestream owner username",
                         "name": "username",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "User update data",
+                        "description": "Update data (title, categoryId)",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/user.PatchRequest"
+                            "$ref": "#/definitions/main_pkg_api_livestream.PatchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Update status",
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_livestream.PatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid claims or identity mismatch",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/signin": {
+            "post": {
+                "description": "Authenticate user and return access token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Sign in user",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_auth.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Access token",
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_auth.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or credentials",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/signup": {
+            "post": {
+                "description": "Register new user and return access token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Sign up new user",
+                "parameters": [
+                    {
+                        "description": "Registration data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_auth.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Access token",
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_auth.RegisterResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "User already exists",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users": {
+            "post": {
+                "description": "Register new user account",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Create user account",
+                "parameters": [
+                    {
+                        "description": "User creation data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_user.PostRequest"
                         }
                     }
                 ],
@@ -1017,21 +826,168 @@
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Invalid claims, identity mismatch, or invalid request data",
+                        "description": "Invalid request, missing name/password, weak password",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Username already exists",
+                        "description": "User already exists",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "description": "Retrieve user profile information",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Get user by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User profile",
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_user.GetResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid user ID",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "User not found or internal error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete own user account (self only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Delete user account",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Delete confirmation",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_user.DeleteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Invalid ID, claims, identity mismatch, or request",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update user profile (self or staff only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Update user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update data (name, password, avatar, banned, partner)",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main_pkg_api_user.PatchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Invalid ID, claims, identity mismatch, request, or weak password",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Name already exists",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main_internal_lib_handler.ErrorResponse"
                         }
                     }
                 }
@@ -1039,7 +995,78 @@
         }
     },
     "definitions": {
-        "auth.LoginRequest": {
+        "main_internal_lib_handler.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "main_internal_lib_null.Array-int32": {
+            "type": "object",
+            "properties": {
+                "explicit": {
+                    "type": "boolean"
+                },
+                "isNull": {
+                    "type": "boolean"
+                },
+                "value": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer",
+                        "format": "int32"
+                    }
+                }
+            }
+        },
+        "main_internal_lib_null.Bool": {
+            "type": "object",
+            "properties": {
+                "explicit": {
+                    "type": "boolean"
+                },
+                "isNull": {
+                    "type": "boolean"
+                },
+                "value": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "main_internal_lib_null.Int": {
+            "type": "object",
+            "properties": {
+                "explicit": {
+                    "type": "boolean"
+                },
+                "isNull": {
+                    "type": "boolean"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main_internal_lib_null.String": {
+            "type": "object",
+            "properties": {
+                "explicit": {
+                    "type": "boolean"
+                },
+                "isNull": {
+                    "type": "boolean"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "main_pkg_api_auth.LoginRequest": {
             "type": "object",
             "properties": {
                 "password": {
@@ -1050,7 +1077,7 @@
                 }
             }
         },
-        "auth.LoginResponse": {
+        "main_pkg_api_auth.LoginResponse": {
             "type": "object",
             "properties": {
                 "access": {
@@ -1058,7 +1085,7 @@
                 }
             }
         },
-        "auth.RegisterRequest": {
+        "main_pkg_api_auth.RegisterRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -1072,7 +1099,7 @@
                 }
             }
         },
-        "auth.RegisterResponse": {
+        "main_pkg_api_auth.RegisterResponse": {
             "type": "object",
             "properties": {
                 "access": {
@@ -1080,13 +1107,13 @@
                 }
             }
         },
-        "category.Category": {
+        "main_pkg_api_category.Category": {
             "type": "object",
             "properties": {
                 "id": {
                     "type": "integer"
                 },
-                "isSafe": {
+                "is_safe": {
                     "type": "boolean"
                 },
                 "link": {
@@ -1094,6 +1121,12 @@
                 },
                 "name": {
                     "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main_pkg_api_category.CategoryTag"
+                    }
                 },
                 "thumbnail": {
                     "type": "string"
@@ -1103,26 +1136,37 @@
                 }
             }
         },
-        "category.GetResponse": {
+        "main_pkg_api_category.CategoryTag": {
             "type": "object",
             "properties": {
-                "category": {
-                    "$ref": "#/definitions/category.Category"
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
-        "category.ListResponse": {
+        "main_pkg_api_category.GetResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "$ref": "#/definitions/main_pkg_api_category.Category"
+                }
+            }
+        },
+        "main_pkg_api_category.ListResponse": {
             "type": "object",
             "properties": {
                 "categories": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/category.ListResponseItem"
+                        "$ref": "#/definitions/main_pkg_api_category.ListResponseItem"
                     }
                 }
             }
         },
-        "category.ListResponseItem": {
+        "main_pkg_api_category.ListResponseItem": {
             "type": "object",
             "properties": {
                 "is_safe": {
@@ -1137,7 +1181,7 @@
                 "tags": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/main_pkg_api_category.CategoryTag"
                     }
                 },
                 "thumbnail": {
@@ -1148,7 +1192,27 @@
                 }
             }
         },
-        "category.PatchRequest": {
+        "main_pkg_api_category.PatchRequest": {
+            "type": "object",
+            "properties": {
+                "is_safe": {
+                    "$ref": "#/definitions/main_internal_lib_null.Bool"
+                },
+                "link": {
+                    "$ref": "#/definitions/main_internal_lib_null.String"
+                },
+                "name": {
+                    "$ref": "#/definitions/main_internal_lib_null.String"
+                },
+                "tags": {
+                    "$ref": "#/definitions/main_internal_lib_null.Array-int32"
+                },
+                "thumbnail": {
+                    "$ref": "#/definitions/main_internal_lib_null.String"
+                }
+            }
+        },
+        "main_pkg_api_category.PostRequest": {
             "type": "object",
             "properties": {
                 "is_safe": {
@@ -1163,7 +1227,7 @@
                 "tags": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "type": "integer"
                     }
                 },
                 "thumbnail": {
@@ -1171,14 +1235,35 @@
                 }
             }
         },
-        "category.PostRequest": {
+        "main_pkg_api_channel.GetResponse": {
             "type": "object",
             "properties": {
-                "is_safe": {
+                "background": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "first_livestream": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_banned": {
                     "type": "boolean"
                 },
-                "link": {
+                "is_partner": {
+                    "type": "boolean"
+                },
+                "last_livestream": {
                     "type": "string"
+                },
+                "links": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main_pkg_api_channel.Link"
+                    }
                 },
                 "name": {
                     "type": "string"
@@ -1186,26 +1271,45 @@
                 "tags": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/main_pkg_api_channel.Tag"
                     }
-                },
-                "thumbnail": {
-                    "type": "string"
                 }
             }
         },
-        "er.RequestError": {
+        "main_pkg_api_channel.Link": {
             "type": "object",
             "properties": {
-                "error": {
+                "id": {
+                    "type": "integer"
+                },
+                "link": {
                     "type": "string"
                 },
-                "success": {
-                    "type": "boolean"
+                "name": {
+                    "type": "string"
                 }
             }
         },
-        "follow.GetResponse": {
+        "main_pkg_api_channel.Tag": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "main_pkg_api_follow.DeleteRequest": {
+            "type": "object",
+            "properties": {
+                "unfollow": {
+                    "type": "string"
+                }
+            }
+        },
+        "main_pkg_api_follow.GetResponse": {
             "type": "object",
             "properties": {
                 "is_follower": {
@@ -1213,18 +1317,18 @@
                 }
             }
         },
-        "follow.ListExtendedResponse": {
+        "main_pkg_api_follow.ListExtendedResponse": {
             "type": "object",
             "properties": {
                 "follow_list": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/follow.ListExtendedResponseItem"
+                        "$ref": "#/definitions/main_pkg_api_follow.ListExtendedResponseItem"
                     }
                 }
             }
         },
-        "follow.ListExtendedResponseItem": {
+        "main_pkg_api_follow.ListExtendedResponseItem": {
             "type": "object",
             "properties": {
                 "avatar": {
@@ -1247,18 +1351,18 @@
                 }
             }
         },
-        "follow.ListResponse": {
+        "main_pkg_api_follow.ListResponse": {
             "type": "object",
             "properties": {
                 "follow_list": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/follow.ListResponseItem"
+                        "$ref": "#/definitions/main_pkg_api_follow.ListResponseItem"
                     }
                 }
             }
         },
-        "follow.ListResponseItem": {
+        "main_pkg_api_follow.ListResponseItem": {
             "type": "object",
             "properties": {
                 "avatar": {
@@ -1269,22 +1373,22 @@
                 }
             }
         },
-        "livestream.DeleteResponse": {
+        "main_pkg_api_follow.PostRequest": {
             "type": "object",
             "properties": {
-                "status": {
-                    "type": "boolean"
+                "follow": {
+                    "type": "string"
                 }
             }
         },
-        "livestream.GetResponse": {
+        "main_pkg_api_livestream.GetResponse": {
             "type": "object",
             "properties": {
                 "avatar": {
                     "type": "string"
                 },
                 "category": {
-                    "$ref": "#/definitions/livestream.LivestreamCategory"
+                    "$ref": "#/definitions/main_pkg_api_livestream.LivestreamCategory"
                 },
                 "id": {
                     "type": "integer"
@@ -1318,31 +1422,25 @@
                 }
             }
         },
-        "livestream.ListResponse": {
+        "main_pkg_api_livestream.ListResponse": {
             "type": "object",
             "properties": {
                 "livestreams": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/livestream.ListResponseItem"
+                        "$ref": "#/definitions/main_pkg_api_livestream.ListResponseItem"
                     }
                 }
             }
         },
-        "livestream.ListResponseItem": {
+        "main_pkg_api_livestream.ListResponseItem": {
             "type": "object",
             "properties": {
                 "avatar": {
                     "type": "string"
                 },
                 "category": {
-                    "$ref": "#/definitions/livestream.LivestreamCategory"
-                },
-                "is_live": {
-                    "type": "boolean"
-                },
-                "is_multistream": {
-                    "type": "boolean"
+                    "$ref": "#/definitions/main_pkg_api_livestream.LivestreamCategory"
                 },
                 "started_at": {
                     "type": "integer"
@@ -1361,9 +1459,12 @@
                 }
             }
         },
-        "livestream.LivestreamCategory": {
+        "main_pkg_api_livestream.LivestreamCategory": {
             "type": "object",
             "properties": {
+                "id": {
+                    "type": "integer"
+                },
                 "link": {
                     "type": "string"
                 },
@@ -1372,18 +1473,23 @@
                 }
             }
         },
-        "livestream.PatchRequest": {
+        "main_pkg_api_livestream.PatchRequest": {
             "type": "object",
             "properties": {
-                "category_link": {
-                    "type": "string"
+                "category_id": {
+                    "$ref": "#/definitions/main_internal_lib_null.Int"
                 },
                 "title": {
-                    "type": "string"
+                    "description": "Channel      null.String `json:\"channel\"`",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/main_internal_lib_null.String"
+                        }
+                    ]
                 }
             }
         },
-        "livestream.PatchResponse": {
+        "main_pkg_api_livestream.PatchResponse": {
             "type": "object",
             "properties": {
                 "status": {
@@ -1391,46 +1497,15 @@
                 }
             }
         },
-        "livestream.PostRequest": {
+        "main_pkg_api_user.DeleteRequest": {
             "type": "object",
             "properties": {
-                "category_link": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "livestream.PostResponse": {
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string"
-                },
-                "started_at": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                },
-                "viewers": {
+                "id": {
                     "type": "integer"
                 }
             }
         },
-        "user.DeleteRequest": {
-            "type": "object",
-            "properties": {
-                "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "user.GetResponse": {
+        "main_pkg_api_user.GetResponse": {
             "type": "object",
             "properties": {
                 "avatar": {
@@ -1445,6 +1520,9 @@
                 "is_banned": {
                     "type": "boolean"
                 },
+                "is_live": {
+                    "type": "boolean"
+                },
                 "is_partner": {
                     "type": "boolean"
                 },
@@ -1456,101 +1534,27 @@
                 }
             }
         },
-        "user.GetResponseNotFound": {
-            "type": "object",
-            "properties": {
-                "result": {
-                    "type": "string"
-                }
-            }
-        },
-        "user.ListRequest": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "first_livestream": {
-                    "type": "string"
-                },
-                "last_livestream": {
-                    "type": "string"
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "registration": {
-                    "type": "string"
-                },
-                "sort": {
-                    "type": "string"
-                }
-            }
-        },
-        "user.ListResponse": {
-            "type": "object",
-            "properties": {
-                "users": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/user.ListResponseItem"
-                    }
-                }
-            }
-        },
-        "user.ListResponseItem": {
+        "main_pkg_api_user.PatchRequest": {
             "type": "object",
             "properties": {
                 "avatar": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "firstLivestream": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "isBanned": {
-                    "type": "boolean"
-                },
-                "isPartner": {
-                    "type": "boolean"
-                },
-                "lastLivestream": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "user.PatchRequest": {
-            "type": "object",
-            "properties": {
-                "avatar": {
-                    "type": "string"
+                    "$ref": "#/definitions/main_internal_lib_null.String"
                 },
                 "is_banned": {
-                    "type": "boolean"
+                    "$ref": "#/definitions/main_internal_lib_null.Bool"
                 },
                 "is_partner": {
-                    "type": "boolean"
-                },
-                "last_livestream": {
-                    "type": "string"
+                    "$ref": "#/definitions/main_internal_lib_null.Bool"
                 },
                 "name": {
-                    "type": "string"
+                    "$ref": "#/definitions/main_internal_lib_null.String"
                 },
                 "password": {
-                    "type": "string"
+                    "$ref": "#/definitions/main_internal_lib_null.String"
                 }
             }
         },
-        "user.PostRequest": {
+        "main_pkg_api_user.PostRequest": {
             "type": "object",
             "properties": {
                 "avatar": {

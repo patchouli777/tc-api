@@ -3,8 +3,10 @@
 
 swag:
 	swag init \
+	--generalInfo ./cmd/server/main.go \
+	--parseDependency \
 	--parseInternal \
-	-g ./internal/app/routes.go
+	--output ./docs
 
 
 up:

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"main/internal/lib/handler"
 	"main/internal/lib/sl"
+	api "main/pkg/api/auth"
 	"net/http"
 	"time"
 )
@@ -25,11 +26,22 @@ func NewHandler(log *slog.Logger, s Service) *Handler {
 	return &Handler{log: log, as: s}
 }
 
-// TODO: update doc
+// SignIn godoc
+//
+//	@Summary		Sign in user
+//	@Description	Authenticate user and return access token
+//	@Tags			Auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		api.LoginRequest		true	"Login credentials"
+//	@Success		200		{object}	api.LoginResponse		"Access token"
+//	@Failure		400		{object}	handler.ErrorResponse	"Invalid request or credentials"
+//	@Failure		500		{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/signin [post]
 func (h Handler) SignIn(w http.ResponseWriter, r *http.Request) {
 	const op = "signing in"
 
-	var request LoginRequest
+	var request api.LoginRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
@@ -52,14 +64,29 @@ func (h Handler) SignIn(w http.ResponseWriter, r *http.Request) {
 	tokenCookie := createTokenCookie(string(tokenPair.Refresh), 720)
 	http.SetCookie(w, &tokenCookie)
 
-	json.NewEncoder(w).Encode(LoginResponse{Access: string(tokenPair.Access)})
+	err = json.NewEncoder(w).Encode(api.LoginResponse{Access: string(tokenPair.Access)})
+	if err != nil {
+
+	}
 }
 
-// TODO: update doc
+// SignUp godoc
+//
+//	@Summary		Sign up new user
+//	@Description	Register new user and return access token
+//	@Tags			Auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		api.RegisterRequest		true	"Registration data"
+//	@Success		200		{object}	api.RegisterResponse	"Access token"
+//	@Failure		400		{object}	handler.ErrorResponse	"Invalid request"
+//	@Failure		409		{object}	handler.ErrorResponse	"User already exists"
+//	@Failure		500		{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/signup [post]
 func (h Handler) SignUp(w http.ResponseWriter, r *http.Request) {
 	const op = "signing up"
 
-	var request RegisterRequest
+	var request api.RegisterRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
@@ -70,8 +97,8 @@ func (h Handler) SignUp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error(op, sl.Err(err))
 
-		if errors.Is(err, errUserAlreadyExists) {
-			handler.Error(h.log, w, op, err, http.StatusConflict, errUserAlreadyExists.Error())
+		if errors.Is(err, errAlreadyExists) {
+			handler.Error(h.log, w, op, err, http.StatusConflict, errAlreadyExists.Error())
 			return
 		}
 
@@ -82,7 +109,7 @@ func (h Handler) SignUp(w http.ResponseWriter, r *http.Request) {
 	tokenCookie := createTokenCookie(string(tokenPair.Refresh), 720)
 	http.SetCookie(w, &tokenCookie)
 
-	json.NewEncoder(w).Encode(RegisterResponse{Access: string(tokenPair.Access)})
+	json.NewEncoder(w).Encode(api.RegisterResponse{Access: string(tokenPair.Access)})
 }
 
 func createTokenCookie(token string, hours int) http.Cookie {

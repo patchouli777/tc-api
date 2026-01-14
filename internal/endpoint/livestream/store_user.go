@@ -12,10 +12,6 @@ type userToIdStore struct {
 	rdb *redis.Client
 }
 
-func (r *userToIdStore) add(ctx context.Context, username string, lsId string) (*redis.StatusCmd, error) {
-	return r.rdb.Set(ctx, r.key(username), lsId, 0), nil
-}
-
 func (r *userToIdStore) addTx(ctx context.Context, tx redis.Pipeliner, username string, lsId string) *redis.StatusCmd {
 	return tx.Set(ctx, r.key(username), lsId, 0)
 }
@@ -27,19 +23,6 @@ func (r *userToIdStore) get(ctx context.Context, username string) (string, error
 	}
 
 	return res, nil
-}
-
-func (r *userToIdStore) getTx(ctx context.Context, tx redis.Pipeliner, username string) (string, error) {
-	res, err := tx.Get(ctx, r.key(username)).Result()
-	if err != nil {
-		return "", err
-	}
-
-	return res, nil
-}
-
-func (r *userToIdStore) delete(ctx context.Context, username string) *redis.IntCmd {
-	return r.rdb.Del(ctx, r.key(username))
 }
 
 func (r *userToIdStore) deleteTx(ctx context.Context, tx redis.Pipeliner, username string) *redis.IntCmd {

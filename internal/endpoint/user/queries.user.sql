@@ -1,4 +1,4 @@
--- name: UserSelectById :one
+-- name: UserSelect :one
 SELECT
     id,
     name,
@@ -37,25 +37,25 @@ VALUES (
     $1,
     $2,
     $3)
-RETURNING
-    id;
+RETURNING id;
 
 
--- name: UserUpdateById :exec
+-- name: UserUpdate :exec
 UPDATE
     tc_user
 SET
-    name       = $1,
-    password   = $2,
-    is_banned  = $3,
-    is_partner = $4,
-    avatar     = $5,
+    name       = CASE WHEN @name_do_update::boolean THEN @name ELSE name END,
+    password   = CASE WHEN @password_do_update::boolean THEN @password ELSE password END,
+    is_banned  = CASE WHEN @is_banned_do_update::boolean THEN @is_banned ELSE is_banned END,
+    is_partner = CASE WHEN @is_partner_do_update::boolean THEN @is_partner ELSE is_partner END,
+    avatar     = CASE WHEN @avatar_do_update::boolean THEN @avatar ELSE avatar END,
     updated_at = CURRENT_DATE
 WHERE
-    id = $6;
+    id = @id
+RETURNING *;
 
 
--- name: UserDeleteById :exec
+-- name: UserDelete :exec
 DELETE FROM
     tc_user
 WHERE

@@ -7,7 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"main/internal/lib/sl"
-	"main/pkg/api/model/streamserver"
+	"main/pkg/api/streamserver"
 	"math/rand"
 	"net/http"
 	"os"
@@ -133,7 +133,6 @@ func (u *StreamServerAdapter) Update(ctx context.Context, timeout time.Duration)
 				thumbnailId := rand.Intn(len(entries))
 				thumbnail := entries[thumbnailId].Name()
 
-				// TODO: pipe
 				u.lsr.UpdateViewers(ctx, st.Name, int32(st.Clients))
 				u.lsr.UpdateThumbnail(ctx, st.Name, "livestreamthumbs/"+thumbnail)
 			}

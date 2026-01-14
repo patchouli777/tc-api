@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/handler"
-	l "main/pkg/api/model/livestream"
+	api "main/pkg/api/livestream"
 	"net/http"
 	"strconv"
 )
@@ -59,16 +59,16 @@ func NewHandler(log *slog.Logger, r GetterListerUpdater) *Handler {
 }
 
 // Get godoc
-// @Summary      Get livestream details
-// @Description  Retrieve current livestream data for a streamer
-// @Tags         Livestreams
-// @Accept       json
-// @Produce      json
-// @Param        username  path  string  true  "Streamer username"  min(1)
-// @Success      200       {object}  l.GetResponse  "Livestream details"
-// @Failure      404       {object}  handler.ErrorResponse  "Livestream not found"
-// @Failure      500       {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /livestreams/{username} [get]
+//
+//	@Summary		Get livestream data
+//	@Description	Retrieve livestream information for a streamer
+//	@Tags			Livestreams
+//	@Produce		json
+//	@Param			username	path		string					true	"Streamer username"
+//	@Success		200			{object}	api.GetResponse			"Livestream data"
+//	@Failure		404			{object}	handler.ErrorResponse	"Livestream not found"
+//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/livestreams/{username} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	const op = "getting livestream data"
 
@@ -84,15 +84,15 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := l.GetResponse{
+	response := api.GetResponse{
 		Id:        int(ls.Id),
-		Username:  ls.User.Name,
-		Avatar:    ls.User.Avatar,
+		Username:  ls.UserName,
+		Avatar:    ls.UserAvatar,
 		StartedAt: int(ls.StartedAt),
 		Viewers:   ls.Viewers,
-		Category: l.LivestreamCategory{
-			Link: ls.Category.Link,
-			Name: ls.Category.Name,
+		Category: api.LivestreamCategory{
+			Link: ls.CategoryLink,
+			Name: ls.CategoryName,
 		},
 		Title:         ls.Title,
 		IsLive:        true,
@@ -106,19 +106,19 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // List godoc
-// @Summary      List livestreams
-// @Description  Get paginated list of livestreams filtered by category
-// @Tags         Livestreams
-// @Accept       json
-// @Produce      json
-// @Param        categoryId  query  string  false  "Category ID (numeric)"
-// @Param        category    query  string  false  "Category link (e.g. path-of-exile)"  min(1)
-// @Param        page        query  string  false  "Page number (default: 1)"
-// @Param        count       query  string  false  "Items per page (default: 10)"
-// @Success      200         {object}  l.ListResponse
-// @Failure      400         {object}  handler.ErrorResponse  "Missing category filter or invalid pagination"
-// @Failure      500         {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /livestreams [get]
+//
+//	@Summary		List livestreams by category
+//	@Description	Get paginated list of livestreams filtered by category
+//	@Tags			Livestreams
+//	@Produce		json
+//	@Param			category	query		string					false	"Category name"
+//	@Param			categoryId	query		string					false	"Category identifier"	minLength(1)
+//	@Param			page		query		int						false	"Page number"			default(1)	minimum(1)
+//	@Param			count		query		int						false	"Items per page"		default(10)	minimum(1)	maximum(100)
+//	@Success		200			{object}	api.ListResponse		"Paginated livestreams"
+//	@Failure		400			{object}	handler.ErrorResponse	"Missing category, invalid page/count"
+//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/livestreams [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	const op = "getting livestreams"
 
@@ -169,17 +169,17 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	listResponse := l.ListResponse{
-		Livestreams: make([]l.ListResponseItem, len(livestreams)),
+	listResponse := api.ListResponse{
+		Livestreams: make([]api.ListResponseItem, len(livestreams)),
 	}
 
 	for i, ls := range livestreams {
-		listResponse.Livestreams[i] = l.ListResponseItem{
-			Username: ls.User.Name,
-			Avatar:   ls.User.Avatar,
-			Category: l.LivestreamCategory{
-				Name: ls.Category.Name,
-				Link: ls.Category.Link,
+		listResponse.Livestreams[i] = api.ListResponseItem{
+			Username: ls.UserName,
+			Avatar:   ls.UserAvatar,
+			Category: api.LivestreamCategory{
+				Name: ls.CategoryName,
+				Link: ls.CategoryLink,
 			},
 			StartedAt: int(ls.StartedAt),
 			Thumbnail: ls.Thumbnail,
@@ -191,51 +191,39 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(listResponse)
 }
 
-// UpdateLivestream godoc
-// @Summary      Update livestream data for a user
-// @Description  Updates title and category of the livestream if the authenticated user matches the username in the path
-// @Tags         livestream
-// @Accept       json
-// @Produce      json
-// @Param        username  path      string       true  "Username"
-// @Param        data      body      PatchRequest  true  "Updated livestream data"
-// @Success      200       {object}  PatchResponse
-// @Failure      400       {object}  er.RequestError
-// @Failure      500       {object}  er.RequestError
-// @Security     ApiKeyAuth
-// @Router       /livestreams/{username} [patch]
-
-// Patch updates the livestream data for the given username.
-// @Summary Update livestream data
-// @Description Update livestream information like title and category for the authenticated user.
-// @Tags livestream
-// @Accept json
-// @Produce json
-// @Param username path string true "Username"
-// @Param request body PatchRequest true "Patch livestream request body"
-// @Success 200 {object} PatchResponse "Successful update response"
-// @Failure 400 {object} er.RequestError "Bad request or unauthorized update attempt"
-// @Failure 500 {object} er.RequestError "Internal server error updating livestream"
-// @Router /livestream/{username} [patch]
+// Patch godoc
+//
+//	@Summary		Update livestream
+//	@Description	Update livestream title and category (owner only)
+//	@Tags			Livestreams
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			username	path		string					true	"Livestream owner username"
+//	@Param			request		body		api.PatchRequest		true	"Update data (title, categoryId)"
+//	@Success		200			{object}	api.PatchResponse		"Update status"
+//	@Failure		401			{object}	handler.ErrorResponse	"Unauthorized - invalid claims or identity mismatch"
+//	@Failure		400			{object}	handler.ErrorResponse	"Invalid request"
+//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/livestreams/{username} [patch]
 func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	const op = "updating livestream"
 
 	username := r.PathValue("username")
 	ctx := r.Context()
-	claims := ctx.Value(auth.AuthContextKey{})
-	user, ok := claims.(*auth.Claims)
+	user, ok := auth.FromContext(ctx)
 
 	if !ok {
-		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusUnauthorized, handler.MsgIdentity)
 		return
 	}
 
 	if user.Username != username {
-		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
+		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusUnauthorized, handler.MsgIdentity)
 		return
 	}
 
-	var request l.PatchRequest
+	var request api.PatchRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
@@ -244,7 +232,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: eventual consistency between postgres and redis
 	// (postgres got updated while redis is down -> big bad)
-	_, err = h.r.Update(r.Context(), username, LivestreamUpdate{
+	_, err = h.r.Update(ctx, username, LivestreamUpdate{
 		Title:      request.Title,
 		CategoryId: request.CategoryId,
 	})
@@ -253,7 +241,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := l.PatchResponse{
+	resp := api.PatchResponse{
 		Status: true,
 	}
 

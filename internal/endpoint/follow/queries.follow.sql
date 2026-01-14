@@ -31,13 +31,15 @@ SELECT
 
 
 -- name: FollowDelete :exec
-DELETE FROM tc_user_follow f
-USING tc_user u1, tc_user u2
+DELETE FROM
+    tc_user_follow f
+USING
+    tc_user u1, tc_user u2
 WHERE
     f.id_user = u1.id
-    AND f.id_follow = u2.id
-    AND u1.name = $1
-    AND u2.name = $2;
+AND f.id_follow = u2.id
+AND u1.name = $1
+AND u2.name = $2;
 
 
 -- name: FollowSelectMany :many
@@ -47,9 +49,13 @@ SELECT
 FROM
     tc_user_follow f
 INNER JOIN
-    tc_user u1 on u1.id = f.id_follow
+    tc_user u1
+ON
+    u1.id = f.id_follow
 INNER JOIN
-    tc_user u2 on u2.id = f.id_user
+    tc_user u2
+ON
+    u2.id = f.id_user
 WHERE
     u2.name = $1;
 

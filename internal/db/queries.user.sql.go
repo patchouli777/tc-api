@@ -11,15 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const userDeleteById = `-- name: UserDeleteById :exec
+const userDelete = `-- name: UserDelete :exec
 DELETE FROM
     tc_user
 WHERE
     id = $1
 `
 
-func (q *Queries) UserDeleteById(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, userDeleteById, id)
+func (q *Queries) UserDelete(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, userDelete, id)
 	return err
 }
 
@@ -32,8 +32,7 @@ VALUES (
     $1,
     $2,
     $3)
-RETURNING
-    id
+RETURNING id
 `
 
 type UserInsertParams struct {
@@ -49,7 +48,7 @@ func (q *Queries) UserInsert(ctx context.Context, arg UserInsertParams) (int32, 
 	return id, err
 }
 
-const userSelectById = `-- name: UserSelectById :one
+const userSelect = `-- name: UserSelect :one
 SELECT
     id,
     name,
@@ -64,7 +63,7 @@ WHERE
     id = $1
 `
 
-type UserSelectByIdRow struct {
+type UserSelectRow struct {
 	ID              int32
 	Name            string
 	Avatar          pgtype.Text
@@ -74,9 +73,9 @@ type UserSelectByIdRow struct {
 	LastLivestream  pgtype.Date
 }
 
-func (q *Queries) UserSelectById(ctx context.Context, id int32) (UserSelectByIdRow, error) {
-	row := q.db.QueryRow(ctx, userSelectById, id)
-	var i UserSelectByIdRow
+func (q *Queries) UserSelect(ctx context.Context, id int32) (UserSelectRow, error) {
+	row := q.db.QueryRow(ctx, userSelect, id)
+	var i UserSelectRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -129,35 +128,46 @@ func (q *Queries) UserSelectByUsername(ctx context.Context, name string) (UserSe
 	return i, err
 }
 
-const userUpdateById = `-- name: UserUpdateById :exec
+const userUpdate = `-- name: UserUpdate :exec
 UPDATE
     tc_user
 SET
-    name       = $1,
-    password   = $2,
-    is_banned  = $3,
-    is_partner = $4,
-    avatar     = $5,
+    name       = CASE WHEN $1::boolean THEN $2 ELSE name END,
+    password   = CASE WHEN $3::boolean THEN $4 ELSE password END,
+    is_banned  = CASE WHEN $5::boolean THEN $6 ELSE is_banned END,
+    is_partner = CASE WHEN $7::boolean THEN $8 ELSE is_partner END,
+    avatar     = CASE WHEN $9::boolean THEN $10 ELSE avatar END,
     updated_at = CURRENT_DATE
 WHERE
-    id = $6
+    id = $11
+RETURNING id, name, password, created_at, updated_at, is_banned, is_partner, first_livestream, last_livestream, stream_token, is_live, avatar, offline_background, description, links, tags, app_role
 `
 
-type UserUpdateByIdParams struct {
-	Name      string
-	Password  string
-	IsBanned  pgtype.Bool
-	IsPartner pgtype.Bool
-	Avatar    pgtype.Text
-	ID        int32
+type UserUpdateParams struct {
+	NameDoUpdate      bool
+	Name              string
+	PasswordDoUpdate  bool
+	Password          string
+	IsBannedDoUpdate  bool
+	IsBanned          pgtype.Bool
+	IsPartnerDoUpdate bool
+	IsPartner         pgtype.Bool
+	AvatarDoUpdate    bool
+	Avatar            pgtype.Text
+	ID                int32
 }
 
-func (q *Queries) UserUpdateById(ctx context.Context, arg UserUpdateByIdParams) error {
-	_, err := q.db.Exec(ctx, userUpdateById,
+func (q *Queries) UserUpdate(ctx context.Context, arg UserUpdateParams) error {
+	_, err := q.db.Exec(ctx, userUpdate,
+		arg.NameDoUpdate,
 		arg.Name,
+		arg.PasswordDoUpdate,
 		arg.Password,
+		arg.IsBannedDoUpdate,
 		arg.IsBanned,
+		arg.IsPartnerDoUpdate,
 		arg.IsPartner,
+		arg.AvatarDoUpdate,
 		arg.Avatar,
 		arg.ID,
 	)

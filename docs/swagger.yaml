@@ -1,18 +1,64 @@
 basePath: /api
 definitions:
-  auth.LoginRequest:
+  main_internal_lib_handler.ErrorResponse:
+    properties:
+      error:
+        type: string
+      success:
+        type: boolean
+    type: object
+  main_internal_lib_null.Array-int32:
+    properties:
+      explicit:
+        type: boolean
+      isNull:
+        type: boolean
+      value:
+        items:
+          format: int32
+          type: integer
+        type: array
+    type: object
+  main_internal_lib_null.Bool:
+    properties:
+      explicit:
+        type: boolean
+      isNull:
+        type: boolean
+      value:
+        type: boolean
+    type: object
+  main_internal_lib_null.Int:
+    properties:
+      explicit:
+        type: boolean
+      isNull:
+        type: boolean
+      value:
+        type: integer
+    type: object
+  main_internal_lib_null.String:
+    properties:
+      explicit:
+        type: boolean
+      isNull:
+        type: boolean
+      value:
+        type: string
+    type: object
+  main_pkg_api_auth.LoginRequest:
     properties:
       password:
         type: string
       username:
         type: string
     type: object
-  auth.LoginResponse:
+  main_pkg_api_auth.LoginResponse:
     properties:
       access:
         type: string
     type: object
-  auth.RegisterRequest:
+  main_pkg_api_auth.RegisterRequest:
     properties:
       email:
         type: string
@@ -21,39 +67,50 @@ definitions:
       username:
         type: string
     type: object
-  auth.RegisterResponse:
+  main_pkg_api_auth.RegisterResponse:
     properties:
       access:
         type: string
     type: object
-  category.Category:
+  main_pkg_api_category.Category:
     properties:
       id:
         type: integer
-      isSafe:
+      is_safe:
         type: boolean
       link:
         type: string
       name:
         type: string
+      tags:
+        items:
+          $ref: '#/definitions/main_pkg_api_category.CategoryTag'
+        type: array
       thumbnail:
         type: string
       viewers:
         type: integer
     type: object
-  category.GetResponse:
+  main_pkg_api_category.CategoryTag:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  main_pkg_api_category.GetResponse:
     properties:
       category:
-        $ref: '#/definitions/category.Category'
+        $ref: '#/definitions/main_pkg_api_category.Category'
     type: object
-  category.ListResponse:
+  main_pkg_api_category.ListResponse:
     properties:
       categories:
         items:
-          $ref: '#/definitions/category.ListResponseItem'
+          $ref: '#/definitions/main_pkg_api_category.ListResponseItem'
         type: array
     type: object
-  category.ListResponseItem:
+  main_pkg_api_category.ListResponseItem:
     properties:
       is_safe:
         type: boolean
@@ -63,14 +120,27 @@ definitions:
         type: string
       tags:
         items:
-          type: string
+          $ref: '#/definitions/main_pkg_api_category.CategoryTag'
         type: array
       thumbnail:
         type: string
       viewers:
         type: integer
     type: object
-  category.PatchRequest:
+  main_pkg_api_category.PatchRequest:
+    properties:
+      is_safe:
+        $ref: '#/definitions/main_internal_lib_null.Bool'
+      link:
+        $ref: '#/definitions/main_internal_lib_null.String'
+      name:
+        $ref: '#/definitions/main_internal_lib_null.String'
+      tags:
+        $ref: '#/definitions/main_internal_lib_null.Array-int32'
+      thumbnail:
+        $ref: '#/definitions/main_internal_lib_null.String'
+    type: object
+  main_pkg_api_category.PostRequest:
     properties:
       is_safe:
         type: boolean
@@ -80,46 +150,72 @@ definitions:
         type: string
       tags:
         items:
-          type: string
+          type: integer
         type: array
       thumbnail:
         type: string
     type: object
-  category.PostRequest:
+  main_pkg_api_channel.GetResponse:
     properties:
-      is_safe:
-        type: boolean
-      link:
+      background:
         type: string
+      description:
+        type: string
+      first_livestream:
+        type: string
+      id:
+        type: integer
+      is_banned:
+        type: boolean
+      is_partner:
+        type: boolean
+      last_livestream:
+        type: string
+      links:
+        items:
+          $ref: '#/definitions/main_pkg_api_channel.Link'
+        type: array
       name:
         type: string
       tags:
         items:
-          type: string
+          $ref: '#/definitions/main_pkg_api_channel.Tag'
         type: array
-      thumbnail:
-        type: string
     type: object
-  er.RequestError:
+  main_pkg_api_channel.Link:
     properties:
-      error:
+      id:
+        type: integer
+      link:
         type: string
-      success:
-        type: boolean
+      name:
+        type: string
     type: object
-  follow.GetResponse:
+  main_pkg_api_channel.Tag:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  main_pkg_api_follow.DeleteRequest:
+    properties:
+      unfollow:
+        type: string
+    type: object
+  main_pkg_api_follow.GetResponse:
     properties:
       is_follower:
         type: boolean
     type: object
-  follow.ListExtendedResponse:
+  main_pkg_api_follow.ListExtendedResponse:
     properties:
       follow_list:
         items:
-          $ref: '#/definitions/follow.ListExtendedResponseItem'
+          $ref: '#/definitions/main_pkg_api_follow.ListExtendedResponseItem'
         type: array
     type: object
-  follow.ListExtendedResponseItem:
+  main_pkg_api_follow.ListExtendedResponseItem:
     properties:
       avatar:
         type: string
@@ -134,31 +230,31 @@ definitions:
       viewers:
         type: integer
     type: object
-  follow.ListResponse:
+  main_pkg_api_follow.ListResponse:
     properties:
       follow_list:
         items:
-          $ref: '#/definitions/follow.ListResponseItem'
+          $ref: '#/definitions/main_pkg_api_follow.ListResponseItem'
         type: array
     type: object
-  follow.ListResponseItem:
+  main_pkg_api_follow.ListResponseItem:
     properties:
       avatar:
         type: string
       name:
         type: string
     type: object
-  livestream.DeleteResponse:
+  main_pkg_api_follow.PostRequest:
     properties:
-      status:
-        type: boolean
+      follow:
+        type: string
     type: object
-  livestream.GetResponse:
+  main_pkg_api_livestream.GetResponse:
     properties:
       avatar:
         type: string
       category:
-        $ref: '#/definitions/livestream.LivestreamCategory'
+        $ref: '#/definitions/main_pkg_api_livestream.LivestreamCategory'
       id:
         type: integer
       is_following:
@@ -180,23 +276,19 @@ definitions:
       viewers:
         type: integer
     type: object
-  livestream.ListResponse:
+  main_pkg_api_livestream.ListResponse:
     properties:
       livestreams:
         items:
-          $ref: '#/definitions/livestream.ListResponseItem'
+          $ref: '#/definitions/main_pkg_api_livestream.ListResponseItem'
         type: array
     type: object
-  livestream.ListResponseItem:
+  main_pkg_api_livestream.ListResponseItem:
     properties:
       avatar:
         type: string
       category:
-        $ref: '#/definitions/livestream.LivestreamCategory'
-      is_live:
-        type: boolean
-      is_multistream:
-        type: boolean
+        $ref: '#/definitions/main_pkg_api_livestream.LivestreamCategory'
       started_at:
         type: integer
       thumbnail:
@@ -208,51 +300,35 @@ definitions:
       viewers:
         type: integer
     type: object
-  livestream.LivestreamCategory:
+  main_pkg_api_livestream.LivestreamCategory:
     properties:
+      id:
+        type: integer
       link:
         type: string
       name:
         type: string
     type: object
-  livestream.PatchRequest:
+  main_pkg_api_livestream.PatchRequest:
     properties:
-      category_link:
-        type: string
+      category_id:
+        $ref: '#/definitions/main_internal_lib_null.Int'
       title:
-        type: string
+        allOf:
+        - $ref: '#/definitions/main_internal_lib_null.String'
+        description: Channel      null.String `json:"channel"`
     type: object
-  livestream.PatchResponse:
+  main_pkg_api_livestream.PatchResponse:
     properties:
       status:
         type: boolean
     type: object
-  livestream.PostRequest:
+  main_pkg_api_user.DeleteRequest:
     properties:
-      category_link:
-        type: string
-      title:
-        type: string
-    type: object
-  livestream.PostResponse:
-    properties:
-      category:
-        type: string
-      started_at:
-        type: integer
-      title:
-        type: string
-      username:
-        type: string
-      viewers:
+      id:
         type: integer
     type: object
-  user.DeleteRequest:
-    properties:
-      user_id:
-        type: integer
-    type: object
-  user.GetResponse:
+  main_pkg_api_user.GetResponse:
     properties:
       avatar:
         type: string
@@ -262,6 +338,8 @@ definitions:
         type: integer
       is_banned:
         type: boolean
+      is_live:
+        type: boolean
       is_partner:
         type: boolean
       last_livestream:
@@ -269,68 +347,20 @@ definitions:
       name:
         type: string
     type: object
-  user.GetResponseNotFound:
-    properties:
-      result:
-        type: string
-    type: object
-  user.ListRequest:
-    properties:
-      count:
-        type: integer
-      first_livestream:
-        type: string
-      last_livestream:
-        type: string
-      page:
-        type: integer
-      registration:
-        type: string
-      sort:
-        type: string
-    type: object
-  user.ListResponse:
-    properties:
-      users:
-        items:
-          $ref: '#/definitions/user.ListResponseItem'
-        type: array
-    type: object
-  user.ListResponseItem:
+  main_pkg_api_user.PatchRequest:
     properties:
       avatar:
-        type: string
-      description:
-        type: string
-      firstLivestream:
-        type: string
-      id:
-        type: integer
-      isBanned:
-        type: boolean
-      isPartner:
-        type: boolean
-      lastLivestream:
-        type: string
-      name:
-        type: string
-    type: object
-  user.PatchRequest:
-    properties:
-      avatar:
-        type: string
+        $ref: '#/definitions/main_internal_lib_null.String'
       is_banned:
-        type: boolean
+        $ref: '#/definitions/main_internal_lib_null.Bool'
       is_partner:
-        type: boolean
-      last_livestream:
-        type: string
+        $ref: '#/definitions/main_internal_lib_null.Bool'
       name:
-        type: string
+        $ref: '#/definitions/main_internal_lib_null.String'
       password:
-        type: string
+        $ref: '#/definitions/main_internal_lib_null.String'
     type: object
-  user.PostRequest:
+  main_pkg_api_user.PostRequest:
     properties:
       avatar:
         type: string
@@ -344,34 +374,33 @@ externalDocs:
   url: https://swagger.io/resources/open-api/
 host: localhost:8090
 info:
-  contact: {}
-  description: "yes"
-  termsOfService: "no"
-  title: twitchclone api
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: desc
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Swagger Example API
   version: "1.0"
 paths:
   /categories:
     get:
       consumes:
       - application/json
-      description: Retrieves a list of categories with optional pagination and sorting
-        parameters
+      description: Retrieve a paginated list of categories with optional sorting
       parameters:
-      - default: 1
-        description: Page number
+      - description: 'Page number (default: 1)'
         in: query
         name: page
-        type: integer
-      - default: 10
-        description: Number of items per page
+        type: string
+      - description: 'Items per page (default: 10)'
         in: query
         name: count
-        type: integer
-      - default: desc
-        description: Sort order (asc or desc)
-        enum:
-        - asc
-        - desc
+        type: string
+      - description: 'Sort order (asc, desc) (default: desc)'
         in: query
         name: sort
         type: string
@@ -379,172 +408,265 @@ paths:
       - application/json
       responses:
         "200":
-          description: List of categories
+          description: OK
           schema:
-            $ref: '#/definitions/category.ListResponse'
+            $ref: '#/definitions/main_pkg_api_category.ListResponse'
         "400":
-          description: Invalid query parameter
+          description: Invalid page, count, or sort parameter
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
-          description: Internal server error while fetching categories
+          description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: List categories with pagination and sorting
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: List categories
       tags:
-      - category
+      - Categories
     post:
       consumes:
       - application/json
-      description: Creates a new category with the given details
+      description: Create a new category (staff only)
       parameters:
-      - description: Category creation request body
+      - description: Bearer token
+        format: jwt
+        in: header
+        name: auth
+        required: true
+        type: string
+      - description: Category data
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/category.PostRequest'
+          $ref: '#/definitions/main_pkg_api_category.PostRequest'
       produces:
       - application/json
       responses:
         "204":
-          description: No Content - category created successfully
+          description: Category created successfully
         "400":
-          description: 'Bad Request: invalid data'
+          description: Invalid auth, insufficient permissions, or malformed request
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
-          description: 'Internal Server Error: failed to add category'
+          description: Internal server error or category already exists
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: Add a new category
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create new category
       tags:
-      - category
-  /categories/{categoryIdentifier}:
+      - Categories
+  /categories/{identifier}:
     delete:
       consumes:
       - application/json
-      description: Deletes a category entity identified by either its numeric ID or
-        unique link (slug).
+      description: Delete a category by ID or link (staff only)
       parameters:
-      - description: Category identifier (either numeric ID or unique link)
+      - description: Category ID or link
         in: path
-        name: categoryIdentifier
+        name: identifier
+        required: true
+        type: string
+      - description: Bearer token
+        format: jwt
+        in: header
+        name: auth
         required: true
         type: string
       produces:
       - application/json
       responses:
         "204":
-          description: No Content - category delted successfully
+          description: Category deleted successfully
+        "400":
+          description: Invalid or insufficient auth permissions
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: Delete category by ID or link
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete category
       tags:
-      - category
+      - Categories
     get:
       consumes:
       - application/json
-      description: Retrieves detailed information about a category by either its numeric
-        ID or a unique link (slug).
+      description: Retrieve a category using either its numeric ID or string link
+        (e.g. "path-of-exile")
       parameters:
-      - description: Category identifier (either numeric ID or unique link)
+      - description: Category ID or link
         in: path
-        name: categoryIdentifier
+        name: identifier
         required: true
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: Category found successfully
+          description: OK
           schema:
-            $ref: '#/definitions/category.GetResponse'
+            $ref: '#/definitions/main_pkg_api_category.GetResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
       summary: Get category by ID or link
       tags:
-      - category
+      - Categories
     patch:
       consumes:
       - application/json
-      description: Partially updates a category entity using provided fields, identified
-        by either numeric ID or unique link (slug).
+      description: Partially update a category by ID or link (staff only)
       parameters:
-      - description: Category identifier (either numeric ID or unique link)
+      - description: Category ID or link
         in: path
-        name: categoryIdentifier
+        name: identifier
         required: true
         type: string
-      - description: Fields to update in the category
+      - description: Bearer token
+        format: jwt
+        in: header
+        name: auth
+        required: true
+        type: string
+      - description: Fields to update
         in: body
-        name: patchRequest
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/category.PatchRequest'
+          $ref: '#/definitions/main_pkg_api_category.PatchRequest'
       produces:
       - application/json
       responses:
         "204":
-          description: No Content - category updated successfully
+          description: Category updated successfully
         "400":
-          description: Invalid request data
+          description: Invalid auth, insufficient permissions, or malformed request
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: Update category by ID or link
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update category
       tags:
-      - category
-  /follow/{username}:
-    delete:
+      - Categories
+  /channels/{channel}:
+    get:
       consumes:
       - application/json
-      description: Allows the authenticated user to unfollow another user by username
+      description: Retrieve detailed information about a specific channel
       parameters:
-      - description: Username of the user to unfollow
+      - description: Channel identifier
         in: path
-        name: username
-        required: true
-        type: string
-      - description: Username of the user to be unfollowed
-        in: query
-        name: unfollowing
+        name: channel
         required: true
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: Unfollow successful
+          description: Channel details
           schema:
-            type: string
+            $ref: '#/definitions/main_pkg_api_channel.GetResponse'
         "400":
-          description: 'Bad Request: user mismatch'
+          description: Missing channel identifier
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
-          description: 'Internal Server Error: failed to unfollow user'
+          description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: Unfollow a user
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: Get channel details
       tags:
-      - follow
+      - Channels
+  /follows:
     get:
-      description: Returns json response
+      description: Get list of users that follower is following (basic or extended)
       parameters:
-      - description: follower
+      - description: Username to get follow list for
+        in: query
+        name: follower
+        required: true
+        type: string
+      - description: true for extended info, false/default for basic
+        in: query
+        name: extended
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Extended follow list
+          schema:
+            $ref: '#/definitions/main_pkg_api_follow.ListExtendedResponse'
+        "400":
+          description: Missing follower parameter
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: List followers or following
+      tags:
+      - Follows
+  /follows/{username}:
+    delete:
+      consumes:
+      - application/json
+      description: Unfollow a specific user
+      parameters:
+      - description: Authenticated user's username
         in: path
         name: username
         required: true
         type: string
-      - description: followed
+      - description: User to unfollow
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main_pkg_api_follow.DeleteRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid claims or identity mismatch
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unfollow user
+      tags:
+      - Follows
+    get:
+      description: Check if one user follows another
+      parameters:
+      - description: Follower username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: Followed username
         in: query
         name: followed
         required: true
@@ -553,204 +675,105 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Follow status
           schema:
-            $ref: '#/definitions/follow.GetResponse'
+            $ref: '#/definitions/main_pkg_api_follow.GetResponse'
         "400":
-          description: Bad Request
+          description: Missing followed parameter
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: is user a follower of other user
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: Check follow status
       tags:
-      - follow
+      - Follows
     post:
       consumes:
       - application/json
-      description: Allows the authenticated user to follow another user by username
+      description: Follow a user (or unfollow if already following)
       parameters:
-      - description: Username of the user to follow
+      - description: Authenticated user's username
         in: path
         name: username
         required: true
         type: string
-      - description: Username of the user to be followed
-        in: query
-        name: following
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Follow successful
-          schema:
-            type: string
-        "400":
-          description: 'Bad Request: user mismatch'
-          schema:
-            $ref: '#/definitions/er.RequestError'
-        "500":
-          description: 'Internal Server Error: failed to follow user'
-          schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: Follow a user
-      tags:
-      - follow
-  /follows:
-    get:
-      consumes:
-      - application/json
-      description: Lists the followees of a given follower username. If `extended=true`
-        is passed as a query parameter, returns detailed info per followee.
-      parameters:
-      - description: Follower username whose follow list is requested
-        in: query
-        name: follower
-        required: true
-        type: string
-      - description: If set to 'true', returns extended follow list details
-        in: query
-        name: extended
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Extended follow list response
-          schema:
-            $ref: '#/definitions/follow.ListExtendedResponse'
-        "400":
-          description: 'Bad request: follower username is missing'
-          schema:
-            $ref: '#/definitions/er.RequestError'
-        "500":
-          description: Internal server error while retrieving follow list
-          schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: Retrieve follower's follow list
-      tags:
-      - follow
-  /livestream/{username}:
-    patch:
-      consumes:
-      - application/json
-      description: Update livestream information like title and category for the authenticated
-        user.
-      parameters:
-      - description: Username
-        in: path
-        name: username
-        required: true
-        type: string
-      - description: Patch livestream request body
+      - description: User to follow/unfollow
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/livestream.PatchRequest'
-      produces:
-      - application/json
+          $ref: '#/definitions/main_pkg_api_follow.PostRequest'
       responses:
-        "200":
-          description: Successful update response
-          schema:
-            $ref: '#/definitions/livestream.PatchResponse'
+        "204":
+          description: No Content
         "400":
-          description: Bad request or unauthorized update attempt
+          description: Invalid request
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid claims or identity mismatch
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
-          description: Internal server error updating livestream
+          description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: Update livestream data
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Follow or unfollow user
       tags:
-      - livestream
+      - Follows
   /livestreams:
     get:
-      consumes:
-      - application/json
-      description: Retrieves a paginated list of livestreams filtered by category
-        or category ID.
+      description: Get paginated list of livestreams filtered by category
       parameters:
-      - description: Category name to filter by
+      - description: Category name
         in: query
         name: category
         type: string
-      - description: Category ID to filter by
+      - description: Category identifier
         in: query
+        minLength: 1
         name: categoryId
         type: string
       - default: 1
-        description: Page number for pagination (default 1)
+        description: Page number
         in: query
+        minimum: 1
         name: page
         type: integer
       - default: 10
-        description: Number of results per page (default 10)
+        description: Items per page
         in: query
+        maximum: 100
+        minimum: 1
         name: count
         type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Livestream list response
+          description: Paginated livestreams
           schema:
-            $ref: '#/definitions/livestream.ListResponse'
+            $ref: '#/definitions/main_pkg_api_livestream.ListResponse'
         "400":
-          description: 'Bad request: missing or invalid parameters'
+          description: Missing category, invalid page/count
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: List livestreams by category or category ID
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: List livestreams by category
       tags:
-      - livestream
+      - Livestreams
   /livestreams/{username}:
-    delete:
-      consumes:
-      - application/json
-      description: Stops the livestream if the authenticated user matches the username
-        in the path
-      parameters:
-      - description: Username
-        in: path
-        name: username
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/livestream.DeleteResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/er.RequestError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/er.RequestError'
-      security:
-      - ApiKeyAuth: []
-      summary: Stop a livestream for a user
-      tags:
-      - livestream
     get:
-      consumes:
-      - application/json
-      description: Retrieves livestream information for the specified streamer username
+      description: Retrieve livestream information for a streamer
       parameters:
-      - description: Streamer Username
+      - description: Streamer username
         in: path
         name: username
         required: true
@@ -759,284 +782,249 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Livestream data
           schema:
-            $ref: '#/definitions/livestream.GetResponse'
+            $ref: '#/definitions/main_pkg_api_livestream.GetResponse'
+        "404":
+          description: Livestream not found
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
-      summary: Get livestream data by username
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: Get livestream data
       tags:
-      - livestream
-    post:
+      - Livestreams
+    patch:
       consumes:
       - application/json
-      description: Starts a livestream if the authenticated user matches the username
-        in the path
+      description: Update livestream title and category (owner only)
       parameters:
-      - description: Username
+      - description: Livestream owner username
         in: path
         name: username
         required: true
         type: string
-      - description: Livestream start data
+      - description: Update data (title, categoryId)
         in: body
-        name: data
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/livestream.PostRequest'
+          $ref: '#/definitions/main_pkg_api_livestream.PatchRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Update status
           schema:
-            $ref: '#/definitions/livestream.PostResponse'
+            $ref: '#/definitions/main_pkg_api_livestream.PatchResponse'
         "400":
-          description: Bad Request
+          description: Invalid request
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid claims or identity mismatch
+          schema:
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Internal server error
           schema:
-            $ref: '#/definitions/er.RequestError'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
       security:
-      - ApiKeyAuth: []
-      summary: Start a new livestream for a user
+      - BearerAuth: []
+      summary: Update livestream
       tags:
-      - livestream
-  /login:
+      - Livestreams
+  /signin:
     post:
       consumes:
       - application/json
-      description: Authenticate user and return access token (refresh token set as
-        cookie)
+      description: Authenticate user and return access token
       parameters:
       - description: Login credentials
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/auth.LoginRequest'
+          $ref: '#/definitions/main_pkg_api_auth.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: Access token returned
+          description: Access token
           schema:
-            $ref: '#/definitions/auth.LoginResponse'
+            $ref: '#/definitions/main_pkg_api_auth.LoginResponse'
         "400":
-          description: Invalid credentials or request data
+          description: Invalid request or credentials
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            type: string
-      summary: User login
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: Sign in user
       tags:
-      - auth
-  /register:
+      - Auth
+  /signup:
     post:
       consumes:
       - application/json
-      description: Register new user account and return access token (refresh token
-        set as cookie)
+      description: Register new user and return access token
       parameters:
       - description: Registration data
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/auth.RegisterRequest'
+          $ref: '#/definitions/main_pkg_api_auth.RegisterRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: Access token returned
+          description: Access token
           schema:
-            $ref: '#/definitions/auth.RegisterResponse'
+            $ref: '#/definitions/main_pkg_api_auth.RegisterResponse'
         "400":
-          description: Invalid request data
+          description: Invalid request
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "409":
           description: User already exists
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            type: string
-      summary: User registration
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: Sign up new user
       tags:
-      - auth
+      - Auth
   /users:
-    get:
-      consumes:
-      - application/json
-      description: List users with optional filters (staff only)
-      parameters:
-      - description: List filters
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/user.ListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/user.ListResponse'
-        "400":
-          description: Invalid claims or insufficient permissions
-          schema:
-            type: string
-        "500":
-          description: Internal server error
-          schema:
-            type: string
-      security:
-      - BearerAuth: []
-      summary: List all users
-      tags:
-      - users
     post:
       consumes:
       - application/json
-      description: Create a new user account with name, password, and optional avatar
+      description: Register new user account
       parameters:
       - description: User creation data
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/user.PostRequest'
-      produces:
-      - application/json
+          $ref: '#/definitions/main_pkg_api_user.PostRequest'
       responses:
         "204":
           description: No Content
         "400":
-          description: Invalid request data or missing fields
+          description: Invalid request, missing name/password, weak password
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "409":
-          description: Username already exists
+          description: User already exists
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            type: string
-      summary: Create new user
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: Create user account
       tags:
-      - users
-  /users/{username}:
+      - Users
+  /users/{id}:
     delete:
       consumes:
       - application/json
-      description: Delete authenticated user's account by providing user ID in request
-        body
+      description: Delete own user account (self only)
       parameters:
-      - description: Username
+      - description: User ID
         in: path
-        name: username
+        name: id
         required: true
-        type: string
-      - description: User ID to delete
+        type: integer
+      - description: Delete confirmation
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/user.DeleteRequest'
-      produces:
-      - application/json
+          $ref: '#/definitions/main_pkg_api_user.DeleteRequest'
       responses:
         "204":
           description: No Content
         "400":
-          description: Invalid claims, identity mismatch, or invalid request data
+          description: Invalid ID, claims, identity mismatch, or request
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete user account
       tags:
-      - users
+      - Users
     get:
-      consumes:
-      - application/json
-      description: Retrieve user information by username
+      description: Retrieve user profile information
       parameters:
-      - description: Username
+      - description: User ID
         in: path
-        name: username
+        name: id
         required: true
-        type: string
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: User profile
           schema:
-            $ref: '#/definitions/user.GetResponse'
-        "404":
-          description: Not Found
+            $ref: '#/definitions/main_pkg_api_user.GetResponse'
+        "400":
+          description: Invalid user ID
           schema:
-            $ref: '#/definitions/user.GetResponseNotFound'
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
-          description: Internal server error
+          description: User not found or internal error
           schema:
-            type: string
-      summary: Get user by username
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
+      summary: Get user by ID
       tags:
-      - users
+      - Users
     patch:
       consumes:
       - application/json
-      description: Update authenticated user's profile information
+      description: Update user profile (self or staff only)
       parameters:
-      - description: Username
+      - description: User ID
         in: path
-        name: username
+        name: id
         required: true
-        type: string
-      - description: User update data
+        type: integer
+      - description: Update data (name, password, avatar, banned, partner)
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/user.PatchRequest'
-      produces:
-      - application/json
+          $ref: '#/definitions/main_pkg_api_user.PatchRequest'
       responses:
         "204":
           description: No Content
         "400":
-          description: Invalid claims, identity mismatch, or invalid request data
+          description: Invalid ID, claims, identity mismatch, request, or weak password
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "409":
-          description: Username already exists
+          description: Name already exists
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            type: string
+            $ref: '#/definitions/main_internal_lib_handler.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update user profile
+      summary: Update user
       tags:
-      - users
+      - Users
 securityDefinitions:
   BasicAuth:
     type: basic

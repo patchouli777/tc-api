@@ -2,7 +2,11 @@ package follow
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"main/internal/db"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type QueriesAdapter struct {
@@ -13,8 +17,12 @@ func (q *QueriesAdapter) Select(ctx context.Context, arg db.FollowSelectParams) 
 	return q.queries.FollowSelect(ctx, arg)
 }
 
-func (q *QueriesAdapter) Delete(ctx context.Context, arg db.FollowDeleteParams) error {
-	return q.queries.FollowDelete(ctx, arg)
+func (q *QueriesAdapter) SelectMany(ctx context.Context, name string) ([]db.FollowSelectManyRow, error) {
+	return q.queries.FollowSelectMany(ctx, name)
+}
+
+func (q *QueriesAdapter) SelectManyExtended(ctx context.Context, name string) ([]db.FollowSelectManyExtendedRow, error) {
+	return q.queries.FollowSelectManyExtended(ctx, name)
 }
 
 func (q *QueriesAdapter) SelectUserId(ctx context.Context, name string) (int32, error) {
@@ -22,13 +30,26 @@ func (q *QueriesAdapter) SelectUserId(ctx context.Context, name string) (int32, 
 }
 
 func (q *QueriesAdapter) Insert(ctx context.Context, arg db.FollowInsertParams) error {
-	return q.queries.FollowInsert(ctx, arg)
+	err := q.queries.FollowInsert(ctx, arg)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == db.CodeUniqueConstraint {
+				return nil
+			}
+		}
+
+		return err
+	}
+
+	return err
 }
 
-func (q *QueriesAdapter) SelectMany(ctx context.Context, name string) ([]db.FollowSelectManyRow, error) {
-	return q.queries.FollowSelectMany(ctx, name)
-}
+func (q *QueriesAdapter) Delete(ctx context.Context, arg db.FollowDeleteParams) error {
+	err := q.queries.FollowDelete(ctx, arg)
 
-func (q *QueriesAdapter) SelectManyExtended(ctx context.Context, name string) ([]db.FollowSelectManyExtendedRow, error) {
-	return q.queries.FollowSelectManyExtended(ctx, name)
+	fmt.Println(err)
+
+	return err
 }

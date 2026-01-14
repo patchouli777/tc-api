@@ -39,10 +39,10 @@ func (r *cache) add(ctx context.Context, ls Livestream) error {
 	lsIdStr := strconv.Itoa(int(ls.Id))
 
 	cmds, err := r.rdb.TxPipelined(ctx, func(p redis.Pipeliner) error {
-		r.userMap.addTx(ctx, p, ls.User.Name, lsIdStr)
-		r.sorted.addTx(ctx, p, ls.Category.Link, ls.Viewers, lsIdStr)
-		r.store.addTx(ctx, p, ls)
-		r.ids.addTx(ctx, p, lsIdStr)
+		r.userMap.addTx(ctx, p, ls.UserName, lsIdStr)                // nolint:errcheck
+		r.sorted.addTx(ctx, p, ls.CategoryLink, ls.Viewers, lsIdStr) // nolint:errcheck
+		r.store.addTx(ctx, p, ls)                                    // nolint:errcheck
+		r.ids.addTx(ctx, p, lsIdStr)                                 // nolint:errcheck
 		return nil
 	})
 
@@ -66,7 +66,7 @@ func (r *cache) get(ctx context.Context, username string) (*Livestream, error) {
 			return nil, errNotFound
 		}
 
-		return nil, fmt.Errorf("unable to find %s's livestream: %w", username, err)
+		return nil, fmt.Errorf("%s's livestream not found: %w", username, err)
 	}
 
 	ls, err := r.store.get(ctx, lsId)
@@ -114,8 +114,6 @@ func (r *cache) update(ctx context.Context, lsId int32, title string, u User, c 
 			"user":     u,
 			"category": c,
 			"title":    title})
-		// r.store.updateFieldTx(ctx, p, lsIdStr, "category", c)
-		// r.store.updateFieldTx(ctx, p, lsIdStr, "title", title)
 		r.ids.addTx(ctx, p, lsIdStr).Err()
 		return nil
 	})
@@ -148,16 +146,24 @@ func (r *cache) updateThumbnail(ctx context.Context, user, thumbnail string) err
 }
 
 func (r *cache) updateViewers(ctx context.Context, user string, viewers int32) error {
-	id, _ := r.userMap.get(ctx, user)
-	ls, _ := r.store.get(ctx, id)
+	id, err := r.userMap.get(ctx, user)
+	if err != nil {
+		return err
+	}
+
+	ls, err := r.store.get(ctx, id)
+	if err != nil {
+		return err
+	}
+
 	cmds, err := r.rdb.TxPipelined(ctx, func(p redis.Pipeliner) error {
-		r.sorted.addTx(ctx, p, ls.Category.Link, viewers, id)
+		r.sorted.addTx(ctx, p, ls.CategoryLink, viewers, id)
 		r.store.updateViewers(ctx, id, int(viewers))
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("pipeline failed: %w", err) // EXEC-level error
+		return fmt.Errorf("pipeline failed: %w", err)
 	}
 
 	for i, cmd := range cmds {
@@ -186,7 +192,7 @@ func (r *cache) delete(ctx context.Context, username string) error {
 
 	cmds, err := r.rdb.TxPipelined(ctx, func(p redis.Pipeliner) error {
 		r.userMap.deleteTx(ctx, p, username)
-		r.sorted.deleteTx(ctx, p, ls.Category.Link)
+		r.sorted.deleteTx(ctx, p, ls.CategoryLink)
 		r.store.deleteTx(ctx, p, lsId)
 		r.ids.deleteTx(ctx, p, lsId)
 		return nil

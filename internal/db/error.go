@@ -6,3 +6,7 @@ var (
 	ErrDuplicateKey = errors.New("duplicate key")
 	ErrNotFound     = errors.New("not found")
 )
+
+const (
+	CodeUniqueConstraint = "23505"
+)

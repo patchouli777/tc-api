@@ -44,7 +44,7 @@ func Run(ctx context.Context) error {
 	mainMux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiMux))
 
 	panicRecovery := mw.PanicRecovery(log)
-	logging := mw.Logging(ctx, log)
+	logging := mw.Logging(log)
 
 	srv := &http.Server{
 		Addr:    "127.0.0.1:1985",

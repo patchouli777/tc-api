@@ -35,7 +35,7 @@ VALUES
 RETURNING *;
 
 
--- name: CategoryUpdate :exec
+-- name: CategoryUpdate :one
 UPDATE tc_category
 SET
     name = CASE WHEN @name_do_update::boolean THEN @name ELSE name END,
@@ -44,6 +44,18 @@ SET
     image = CASE WHEN @image_do_update::boolean THEN @image ELSE image END
 WHERE
     id = @id
+RETURNING *;
+
+
+-- name: CategoryUpdateByLink :one
+UPDATE tc_category
+SET
+    name = CASE WHEN @name_do_update::boolean THEN @name ELSE name END,
+    link = CASE WHEN @link_do_update::boolean THEN @link ELSE link END,
+    is_safe = CASE WHEN @is_safe_do_update::boolean THEN @is_safe ELSE is_safe END,
+    image = CASE WHEN @image_do_update::boolean THEN @image ELSE image END
+WHERE
+    link = @link_upd
 RETURNING *;
 
 
@@ -79,8 +91,17 @@ WHERE
     id_tag = inserted.id_tag;
 
 
--- name: CategoryDelete :exec
+-- name: CategoryDelete :one
 DELETE FROM
     tc_category
 WHERE
-    id = $1;
+    id = $1
+RETURNING *;
+
+
+-- name: CategoryDeleteByLink :one
+DELETE FROM
+    tc_category
+WHERE
+    link = $1
+RETURNING *;

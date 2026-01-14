@@ -6,11 +6,11 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/handler"
-	f "main/pkg/api/model/follow"
+	api "main/pkg/api/follow"
 	"net/http"
 )
 
-type Service interface {
+type Repository interface {
 	IsFollower(ctx context.Context, follower, followed string) (bool, error)
 	List(ctx context.Context, follower string) ([]FollowerListItem, error)
 	ListExtended(ctx context.Context, follower string) ([]FollowingListExtendedItem, error)
@@ -19,27 +19,27 @@ type Service interface {
 }
 
 type Handler struct {
-	s   Service
+	r   Repository
 	log *slog.Logger
 }
 
-func NewHandler(log *slog.Logger, s Service) *Handler {
-	return &Handler{s: s, log: log}
+func NewHandler(log *slog.Logger, r Repository) *Handler {
+	return &Handler{r: r, log: log}
 }
 
 // Get godoc
-// @Summary      Check follow status
-// @Description  Check if one user follows another
-// @Tags         Follows
-// @Accept       json
-// @Produce      json
-// @Param        username  path     string  true  "Follower username"  min(1)
-// @Param        followed  query    string  true  "Followed username"  min(1)
-// @Success      200       {object}  f.GetResponse
-// @Failure      400       {object}  handler.ErrorResponse  "Missing followed parameter"
-// @Failure      500       {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /follows/{username} [get]
-func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
+//
+//	@Summary		Check follow status
+//	@Description	Check if one user follows another
+//	@Tags			Follows
+//	@Produce		json
+//	@Param			username	path		string					true	"Follower username"
+//	@Param			followed	query		string					true	"Followed username"
+//	@Success		200			{object}	api.GetResponse			"Follow status"
+//	@Failure		400			{object}	handler.ErrorResponse	"Missing followed parameter"
+//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/follows/{username} [get]
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	const op = "getting follow status"
 
 	follower := r.PathValue("username")
@@ -51,29 +51,29 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isFollower, err := h.s.IsFollower(ctx, follower, followed)
+	isFollower, err := h.r.IsFollower(ctx, follower, followed)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
-	json.NewEncoder(w).Encode(f.GetResponse{IsFollower: isFollower})
+	json.NewEncoder(w).Encode(api.GetResponse{IsFollower: isFollower})
 }
 
 // List godoc
-// @Summary      List user's follows
-// @Description  Get list of users that a follower is following (basic or extended)
-// @Tags         Follows
-// @Accept       json
-// @Produce      json
-// @Param        follower  query    string  true  "Follower username"  min(1)
-// @Param        extended  query    string  false "Include extended data (true/false)"  Enums(true, false)
-// @Success      200  {object}  f.ListResponse          "Basic follow list"
-// @Success      200  {object}  f.ListExtendedResponse  "Extended follow list"
-// @Failure      400  {object}  handler.ErrorResponse  "Missing follower parameter"
-// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /follows [get]
-func (h Handler) List(w http.ResponseWriter, r *http.Request) {
+//
+//	@Summary		List followers or following
+//	@Description	Get list of users that follower is following (basic or extended)
+//	@Tags			Follows
+//	@Produce		json
+//	@Param			follower	query		string						true	"Username to get follow list for"
+//	@Param			extended	query		string						false	"true for extended info, false/default for basic"
+//	@Success		200			{object}	api.ListResponse			"Basic follow list"
+//	@Success		200			{object}	api.ListExtendedResponse	"Extended follow list"
+//	@Failure		400			{object}	handler.ErrorResponse		"Missing follower parameter"
+//	@Failure		500			{object}	handler.ErrorResponse		"Internal server error"
+//	@Router			/follows [get]
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	const op = "getting follow list"
 
 	ctx := r.Context()
@@ -86,50 +86,50 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	extended := r.URL.Query().Get("extended")
 	if extended == "true" {
-		extendedList, err := h.s.ListExtended(ctx, follower)
+		extendedList, err := h.r.ListExtended(ctx, follower)
 		if err != nil {
 			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 			return
 		}
 
-		following := make([]f.ListExtendedResponseItem, len(extendedList))
+		following := make([]api.ListExtendedResponseItem, len(extendedList))
 		for i, item := range extendedList {
-			following[i] = f.ListExtendedResponseItem(item)
+			following[i] = api.ListExtendedResponseItem(item)
 		}
 
-		json.NewEncoder(w).Encode(f.ListExtendedResponse{FollowList: following})
+		json.NewEncoder(w).Encode(api.ListExtendedResponse{FollowList: following})
 		return
 	}
 
-	followList, err := h.s.List(ctx, follower)
+	followList, err := h.r.List(ctx, follower)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
 	}
 
-	following := make([]f.ListResponseItem, len(followList))
+	following := make([]api.ListResponseItem, len(followList))
 	for i, item := range followList {
-		following[i] = f.ListResponseItem(item)
+		following[i] = api.ListResponseItem(item)
 	}
 
-	json.NewEncoder(w).Encode(f.ListResponse{FollowList: following})
+	json.NewEncoder(w).Encode(api.ListResponse{FollowList: following})
 }
 
 // Post godoc
-// @Summary      Follow a user
-// @Description  Current user follows another user
-// @Tags         Follows
-// @Accept       json
-// @Produce      json
-// @Param        username   path     string  true  "Username to follow for (must match auth user)"  min(1)
-// @Param        auth       header   string  true  "Bearer token"  format(jwt)
-// @Param        following  query    string  true  "Username to follow"  min(1)
-// @Security     BearerAuth
-// @Success      204  "User followed successfully"
-// @Failure      400  {object}  handler.ErrorResponse  "Invalid auth or username mismatch"
-// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /follows/{username} [post]
-func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
+//
+//	@Summary		Follow or unfollow user
+//	@Description	Follow a user (or unfollow if already following)
+//	@Tags			Follows
+//	@Accept			json
+//	@Security		BearerAuth
+//	@Param			username	path		string			true	"Authenticated user's username"
+//	@Param			request		body		api.PostRequest	true	"User to follow/unfollow"
+//	@Success		204			{object}	nil
+//	@Failure		401			{object}	handler.ErrorResponse	"Unauthorized - invalid claims or identity mismatch"
+//	@Failure		400			{object}	handler.ErrorResponse	"Invalid request"
+//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/follows/{username} [post]
+func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	const op = "following user"
 
 	username := r.PathValue("username")
@@ -138,18 +138,23 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 	user, ok := claims.(*auth.Claims)
 
 	if !ok {
-		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusUnauthorized, handler.MsgIdentity)
 		return
 	}
 
 	if user.Username != username {
-		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
+		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusUnauthorized, handler.MsgIdentity)
 		return
 	}
 
-	following := r.URL.Query().Get("following")
+	var req api.PostRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
+		return
+	}
 
-	err := h.s.Follow(ctx, username, following)
+	err = h.r.Follow(ctx, username, req.Follow)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return
@@ -159,20 +164,20 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete godoc
-// @Summary      Unfollow a user
-// @Description  Current user stops following another user
-// @Tags         Follows
-// @Accept       json
-// @Produce      json
-// @Param        username    path     string  true  "Username to unfollow for (must match auth user)"  min(1)
-// @Param        auth        header   string  true  "Bearer token"  format(jwt)
-// @Param        unfollowing query    string  true  "Username to unfollow"  min(1)
-// @Security     BearerAuth
-// @Success      204  "User unfollowed successfully"
-// @Failure      400  {object}  handler.ErrorResponse  "Invalid auth or username mismatch"
-// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /follows/{username} [delete]
-func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
+//
+//	@Summary		Unfollow user
+//	@Description	Unfollow a specific user
+//	@Tags			Follows
+//	@Accept			json
+//	@Security		BearerAuth
+//	@Param			username	path		string				true	"Authenticated user's username"
+//	@Param			request		body		api.DeleteRequest	true	"User to unfollow"
+//	@Success		204			{object}	nil
+//	@Failure		401			{object}	handler.ErrorResponse	"Unauthorized - invalid claims or identity mismatch"
+//	@Failure		400			{object}	handler.ErrorResponse	"Invalid request"
+//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/follows/{username} [delete]
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	const op = "unfollowing user"
 
 	username := r.PathValue("username")
@@ -181,17 +186,23 @@ func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	user, ok := claims.(*auth.Claims)
 
 	if !ok {
-		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
+		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusUnauthorized, handler.MsgIdentity)
 		return
 	}
 
 	if user.Username != username {
-		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
+		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusUnauthorized, handler.MsgIdentity)
 		return
 	}
 
-	unfollowing := r.URL.Query().Get("unfollowing")
-	err := h.s.Unfollow(ctx, username, unfollowing)
+	var req api.DeleteRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
+		return
+	}
+
+	err = h.r.Unfollow(ctx, username, req.Unfollow)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 		return

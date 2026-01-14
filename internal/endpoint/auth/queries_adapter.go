@@ -19,37 +19,24 @@ func NewAdapter(pool *pgxpool.Pool) *QueriesAdapter {
 }
 
 func (q *QueriesAdapter) Select(ctx context.Context, arg db.AuthSelectUserParams) (*db.AuthSelectUserRow, error) {
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Release()
-
-	queries := *db.New(conn)
+	queries := db.New(q.Pool)
 	res, err := queries.AuthSelectUser(ctx, arg)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, db.ErrNotFound
+		return nil, errNotFound
 	}
 
 	return &res, nil
 }
 
 func (q *QueriesAdapter) Insert(ctx context.Context, arg db.AuthInsertUserParams) error {
-	conn, err := q.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
-
-	queries := *db.New(conn)
-
-	err = queries.AuthInsertUser(ctx, arg)
+	queries := db.New(q.Pool)
+	err := queries.AuthInsertUser(ctx, arg)
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
-		if pgErr.Code == "23505" {
-			return db.ErrDuplicateKey
+		if pgErr.Code == db.CodeUniqueConstraint {
+			return errAlreadyExists
 		}
 	}
 

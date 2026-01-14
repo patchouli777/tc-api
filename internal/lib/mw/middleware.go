@@ -9,17 +9,28 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-func Logging(ctx context.Context, log *slog.Logger) func(http.Handler) http.Handler {
+func Logging(log *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			start := time.Now()
 			next.ServeHTTP(w, req)
+
+			ctx := req.Context()
+
+			id, ok := ReqIdFromContext(ctx)
+			if !ok {
+				log.Error("request id big bad")
+			}
+
 			log.LogAttrs(ctx, slog.LevelInfo, "request",
 				slog.String("method", req.Method),
 				slog.String("uri", req.RequestURI),
-				slog.String("time", time.Since(start).String()))
+				slog.String("time", time.Since(start).String()),
+				slog.String("request_id", id))
 		})
 	}
 }
@@ -57,11 +68,34 @@ func PanicRecovery(log *slog.Logger) func(http.Handler) http.Handler {
 				if rcv := recover(); rcv != nil {
 					log.Error("recover after panic: %v\n. stack trace:\n%s", rcv, debug.Stack())
 					w.WriteHeader(http.StatusInternalServerError)
-					json.NewEncoder(w).Encode(handler.RequestError{Success: false, Error: "internal error"})
+					json.NewEncoder(w).Encode(handler.ErrorResponse{Success: false, Error: "internal error"})
 					return
 				}
 			}()
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func ReqIdFromContext(ctx context.Context) (string, bool) {
+	id := ctx.Value(RequestIDContextKey{})
+	idStr, ok := id.(string)
+	return idStr, ok
+}
+
+type RequestIDContextKey struct{}
+
+func RequestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.Header.Get("tc-Request-ID")
+		if id == "" {
+			id = uuid.New().String()
+			r.Header.Set("tc-Request-ID", id)
+		}
+
+		ctx := context.WithValue(r.Context(), RequestIDContextKey{}, id)
+		r = r.WithContext(ctx)
+
+		next.ServeHTTP(w, r)
+	})
 }

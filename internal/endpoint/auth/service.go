@@ -40,10 +40,6 @@ func (s *ServiceImpl) SignIn(ctx context.Context, username, password string) (*T
 func (s *ServiceImpl) SignUp(ctx context.Context, email, username, password string) (*TokenPair, error) {
 	err := s.queries.Insert(ctx, db.AuthInsertUserParams{Name: username, Password: password})
 	if err != nil {
-		if errors.Is(err, db.ErrDuplicateKey) {
-			return nil, errUserAlreadyExists
-		}
-
 		return nil, err
 	}
 

@@ -11,7 +11,7 @@ import (
 	"main/internal/endpoint/follow"
 	"main/internal/endpoint/livestream"
 	"main/internal/endpoint/user"
-	livestreamApi "main/pkg/api/model/livestream"
+	livestreamApi "main/pkg/api/livestream"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -21,8 +21,8 @@ func Populate(ctx context.Context,
 	as *auth.ServiceImpl,
 	ls *livestream.StreamServerAdapter,
 	cr *category.RepositoryImpl,
-	fs *follow.ServiceImpl,
-	us *user.ServiceImpl) {
+	fs *follow.RepositoryImpl,
+	us *user.RepositoryImpl) {
 	addTags(ctx, pool)
 	addUsers(ctx, pool)
 	addCategories(ctx, cr)
@@ -104,7 +104,7 @@ func addTags(ctx context.Context, pool *pgxpool.Pool) {
 	slog.Info("tags added")
 }
 
-func addFollows(ctx context.Context, fs *follow.ServiceImpl) {
+func addFollows(ctx context.Context, fs *follow.RepositoryImpl) {
 	slog.Info("adding follows")
 
 	for i := range followCount {

@@ -6,13 +6,15 @@ import (
 )
 
 type Livestream struct {
-	Id        int32    `redis:"id"`
-	Title     string   `redis:"title"`
-	Thumbnail string   `redis:"thumbnail"`
-	Viewers   int32    `redis:"viewers"`
-	StartedAt int64    `redis:"started_at"`
-	User      User     `redis:"user"`
-	Category  Category `redis:"category"`
+	Id           int32  `redis:"id"`
+	Title        string `redis:"title"`
+	Thumbnail    string `redis:"thumbnail"`
+	Viewers      int32  `redis:"viewers"`
+	StartedAt    int64  `redis:"started_at"`
+	UserName     string `redis:"user:name"`
+	UserAvatar   string `redis:"user:avatar"`
+	CategoryName string `redis:"category:name"`
+	CategoryLink string `redis:"category:link"`
 }
 
 type LivestreamUpdate struct {
@@ -21,8 +23,7 @@ type LivestreamUpdate struct {
 }
 
 type LivestreamCreate struct {
-	Title string
-	// TODO: type CategoryIdentifier + methods IsLink(), IsId()
+	Title    string
 	Category string
 	Username string
 }

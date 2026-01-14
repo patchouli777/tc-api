@@ -7,14 +7,13 @@ import (
 	"log/slog"
 	"main/internal/auth"
 	"main/internal/lib/handler"
-	"main/internal/lib/sl"
-	c "main/pkg/api/model/category"
+	c "main/pkg/api/category"
 	"net/http"
 	"strconv"
 )
 
 type Getter interface {
-	GetById(ctx context.Context, id int) (*Category, error)
+	Get(ctx context.Context, id int) (*Category, error)
 	GetByLink(ctx context.Context, link string) (*Category, error)
 }
 
@@ -27,18 +26,17 @@ type Creater interface {
 }
 
 type Updater interface {
+	Update(ctx context.Context, id int32, cat CategoryUpdate) error
 	UpdateByLink(ctx context.Context, link string, cat CategoryUpdate) error
-	UpdateById(ctx context.Context, id int32, cat CategoryUpdate) error
 }
 
 type Deleter interface {
-	DeleteById(ctx context.Context, id int32) error
+	Delete(ctx context.Context, id int32) error
 	DeleteByLink(ctx context.Context, link string) error
 }
 
 type ViewerUpdater interface {
-	UpdateViewersByLink(ctx context.Context, link string, viewers int) error
-	UpdateViewersById(ctx context.Context, id int, viewers int) error
+	UpdateViewers(ctx context.Context, id int, viewers int) error
 }
 
 type Repository interface {
@@ -60,32 +58,32 @@ func NewHandler(log *slog.Logger, repo Repository) *Handler {
 }
 
 // Get retrieves a category by its ID or unique link.
-// @Summary      Get category by ID or link
-// @Description  Retrieve a category using either its numeric ID or string link (e.g. "path-of-exile")
-// @Tags         Categories
-// @Accept       json
-// @Produce      json
-// @Param        categoryIdentifier  path    string  true  "Category ID or link"  min(1)
-// @Success      200  {object}  c.GetResponse
-// @Failure      404  {object}  handler.ErrorResponse  "Category not found"
-// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /categories/{categoryIdentifier} [get]
+//
+//	@Summary		Get category by ID or link
+//	@Description	Retrieve a category using either its numeric ID or string link (e.g. "path-of-exile")
+//	@Tags			Categories
+//	@Accept			json
+//	@Produce		json
+//	@Param			identifier	path		string	true	"Category ID or link"	min(1)
+//	@Success		200			{object}	c.GetResponse
+//	@Failure		404			{object}	handler.ErrorResponse	"Category not found"
+//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/categories/{identifier} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	const op = "getting category"
 	ctx := r.Context()
 
-	// {categoryIdentifier} is either int id or string category link (e.g. "path-of-exile")
-	categoryIdentifier := r.PathValue("categoryIdentifier")
+	// {identifier} is either int id or string category link (e.g. "path-of-exile")
+	identifier := r.PathValue("identifier")
 
 	var category *Category = nil
 	var getErr error = nil
 
-	// TODO: don't cast here
-	categoryId, err := strconv.Atoi(categoryIdentifier)
+	categoryId, err := strconv.Atoi(identifier)
 	if err == nil {
-		category, getErr = h.repo.GetById(ctx, categoryId)
+		category, getErr = h.repo.Get(ctx, categoryId)
 	} else {
-		category, getErr = h.repo.GetByLink(ctx, categoryIdentifier)
+		category, getErr = h.repo.GetByLink(ctx, identifier)
 	}
 
 	if getErr != nil {
@@ -115,18 +113,19 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // List retrieves list of categories with page, count and sort by viewers (asc/desc) filters
-// @Summary      List categories
-// @Description  Retrieve a paginated list of categories with optional sorting
-// @Tags         Categories
-// @Accept       json
-// @Produce      json
-// @Param        page   query    string  false  "Page number (default: 1)"
-// @Param        count  query    string  false  "Items per page (default: 10)"
-// @Param        sort   query    string  false  "Sort order (asc, desc) (default: desc)"
-// @Success      200    {object}  c.ListResponse
-// @Failure      400    {object}  handler.ErrorResponse  "Invalid page, count, or sort parameter"
-// @Failure      500    {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /categories [get]
+//
+//	@Summary		List categories
+//	@Description	Retrieve a paginated list of categories with optional sorting
+//	@Tags			Categories
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	query		string	false	"Page number (default: 1)"
+//	@Param			count	query		string	false	"Items per page (default: 10)"
+//	@Param			sort	query		string	false	"Sort order (asc, desc) (default: desc)"
+//	@Success		200		{object}	c.ListResponse
+//	@Failure		400		{object}	handler.ErrorResponse	"Invalid page, count, or sort parameter"
+//	@Failure		500		{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/categories [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	const op = "getting categories"
 
@@ -194,18 +193,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Post creates a new category
-// @Summary      Create new category
-// @Description  Create a new category (staff only)
-// @Tags         Categories
-// @Accept       json
-// @Produce      json
-// @Param        auth      header     string                  true  "Bearer token"  format(jwt)
-// @Param        request   body       c.PostRequest           true  "Category data"
-// @Security     BearerAuth
-// @Success      204       "Category created successfully"
-// @Failure      400       {object}  handler.ErrorResponse  "Invalid auth, insufficient permissions, or malformed request"
-// @Failure      500       {object}  handler.ErrorResponse  "Internal server error or category already exists"
-// @Router       /categories [post]
+//
+//	@Summary		Create new category
+//	@Description	Create a new category (staff only)
+//	@Tags			Categories
+//	@Accept			json
+//	@Produce		json
+//	@Param			auth	header	string			true	"Bearer token"	format(jwt)
+//	@Param			request	body	c.PostRequest	true	"Category data"
+//	@Security		BearerAuth
+//	@Success		204	"Category created successfully"
+//	@Failure		400	{object}	handler.ErrorResponse	"Invalid auth, insufficient permissions, or malformed request"
+//	@Failure		500	{object}	handler.ErrorResponse	"Internal server error or category already exists"
+//	@Router			/categories [post]
 func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	const op = "creating category"
 
@@ -230,6 +230,11 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Link == "" || req.Name == "" {
+		handler.Error(h.log, w, op, errEmptyNameLink, http.StatusBadRequest, errEmptyNameLink.Error())
+		return
+	}
+
 	err = h.repo.Create(ctx, CategoryCreate{
 		Thumbnail: req.Thumbnail,
 		Name:      req.Name,
@@ -250,19 +255,20 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 // Patch updates a category by its ID or unique link.
-// @Summary      Update category
-// @Description  Partially update a category by ID or link (staff only)
-// @Tags         Categories
-// @Accept       json
-// @Produce      json
-// @Param        categoryIdentifier  path    string  true  "Category ID or link"  min(1)
-// @Param        auth                header  string  true  "Bearer token"  format(jwt)
-// @Param        request             body    c.PatchRequest  true  "Fields to update"
-// @Security     BearerAuth
-// @Success      204  "Category updated successfully"
-// @Failure      400  {object}  handler.ErrorResponse  "Invalid auth, insufficient permissions, or malformed request"
-// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /categories/{categoryIdentifier} [patch]
+//
+//	@Summary		Update category
+//	@Description	Partially update a category by ID or link (staff only)
+//	@Tags			Categories
+//	@Accept			json
+//	@Produce		json
+//	@Param			identifier	path	string			true	"Category ID or link"	min(1)
+//	@Param			auth		header	string			true	"Bearer token"			format(jwt)
+//	@Param			request		body	c.PatchRequest	true	"Fields to update"
+//	@Security		BearerAuth
+//	@Success		204	"Category updated successfully"
+//	@Failure		400	{object}	handler.ErrorResponse	"Invalid auth, insufficient permissions, or malformed request"
+//	@Failure		500	{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/categories/{identifier} [patch]
 func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	const op = "updating category"
 	ctx := r.Context()
@@ -280,57 +286,74 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request c.PatchRequest
-	err := json.NewDecoder(r.Body).Decode(&request)
+	var req c.PatchRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return
 	}
 
-	upd := CategoryUpdate{
-		IsSafe:    request.IsSafe,
-		Thumbnail: request.Thumbnail,
-		Name:      request.Name,
-		Link:      request.Link,
-		Tags:      request.Tags}
+	if req.Link.Value == "" || req.Name.Value == "" {
+		handler.Error(h.log, w, op, errEmptyNameLink, http.StatusBadRequest, errEmptyNameLink.Error())
+		return
+	}
 
-	categoryIdentifier := r.PathValue("categoryIdentifier")
-	categoryId, err := strconv.Atoi(categoryIdentifier)
+	upd := CategoryUpdate{
+		IsSafe:    req.IsSafe,
+		Thumbnail: req.Thumbnail,
+		Name:      req.Name,
+		Link:      req.Link,
+		Tags:      req.Tags}
+
+	identifier := r.PathValue("identifier")
+	categoryId, err := strconv.Atoi(identifier)
 	if err != nil {
-		h.log.Error("category identifier is not parsable as id", sl.Err(err))
-	} else {
-		err := h.repo.UpdateById(ctx, int32(categoryId), upd)
+		h.log.Info("updating category by link", slog.String("link", identifier))
+
+		err = h.repo.UpdateByLink(ctx, identifier, upd)
 		if err != nil {
+			if errors.Is(err, errNotFound) {
+				handler.Error(h.log, w, op, err, http.StatusInternalServerError, err.Error())
+				return
+			}
+
 			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		return
-	}
+	} else {
+		h.log.Info("updating category by id", slog.Int("id", categoryId))
 
-	err = h.repo.UpdateByLink(ctx, categoryIdentifier, upd)
-	if err != nil {
-		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
-		return
-	}
+		err := h.repo.Update(ctx, int32(categoryId), upd)
+		if err != nil {
+			if errors.Is(err, errNotFound) {
+				handler.Error(h.log, w, op, err, http.StatusInternalServerError, err.Error())
+				return
+			}
 
-	w.WriteHeader(http.StatusNoContent)
+			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 // Delete removes a category by its ID or unique link.
-// @Summary      Delete category
-// @Description  Delete a category by ID or link (staff only)
-// @Tags         Categories
-// @Accept       json
-// @Produce      json
-// @Param        categoryIdentifier  path    string  true  "Category ID or link"  min(1)
-// @Param        auth                header  string  true  "Bearer token"  format(jwt)
-// @Security     BearerAuth
-// @Success      204  "Category deleted successfully"
-// @Failure      400  {object}  handler.ErrorResponse  "Invalid or insufficient auth permissions"
-// @Failure      500  {object}  handler.ErrorResponse  "Internal server error"
-// @Router       /categories/{categoryIdentifier} [delete]
+//
+//	@Summary		Delete category
+//	@Description	Delete a category by ID or link (staff only)
+//	@Tags			Categories
+//	@Accept			json
+//	@Produce		json
+//	@Param			identifier	path	string	true	"Category ID or link"	min(1)
+//	@Param			auth		header	string	true	"Bearer token"			format(jwt)
+//	@Security		BearerAuth
+//	@Success		204	"Category deleted successfully"
+//	@Failure		400	{object}	handler.ErrorResponse	"Invalid or insufficient auth permissions"
+//	@Failure		500	{object}	handler.ErrorResponse	"Internal server error"
+//	@Router			/categories/{identifier} [delete]
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	const op = "deleting category"
 
@@ -348,23 +371,33 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	categoryIdentifier := r.PathValue("categoryIdentifier")
-	categoryId, err := strconv.Atoi(categoryIdentifier)
+	identifier := r.PathValue("identifier")
+	categoryId, err := strconv.Atoi(identifier)
 	if err != nil {
-		h.log.Error("category identifier is not parsable as id", sl.Err(err))
-	} else {
-		err := h.repo.DeleteById(ctx, int32(categoryId))
+		h.log.Error("deleting category by link", slog.String("link", identifier))
+
+		err = h.repo.DeleteByLink(ctx, identifier)
 		if err != nil {
+			if errors.Is(err, errNotFound) {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
+			return
+		}
+	} else {
+		h.log.Error("deleting category by id", slog.Int("id", categoryId))
+
+		err := h.repo.Delete(ctx, int32(categoryId))
+		if err != nil {
+			if errors.Is(err, errNotFound) {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
 			handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
 			return
 		}
 	}
-
-	err = h.repo.DeleteByLink(ctx, categoryIdentifier)
-	if err != nil {
-		handler.Error(h.log, w, op, err, http.StatusInternalServerError, handler.MsgInternal)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
 }

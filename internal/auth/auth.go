@@ -12,3 +12,8 @@ type Claims struct {
 }
 
 var JWTKey = []byte("my_secret_key")
+
+const (
+	RoleStaff = "staff"
+	RoleUser  = "user"
+)

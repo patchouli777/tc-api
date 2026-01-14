@@ -15,15 +15,16 @@ const (
 )
 
 type Config struct {
-	Postgres        PostgresConfig
-	HTTP            HttpServerConfig
-	GRPC            GrpcClientConfig
-	Redis           RedisConfig
-	Logger          LoggerConfig
-	Update          UpdateConfig
-	Env             string `env:"ENV" env-default:"prod"`
-	InstanceID      uuid.UUID
-	AuthServiceMock bool `env:"AUTH_SERVICE_MOCK" env-default:"false"`
+	Postgres           PostgresConfig
+	HTTP               HttpServerConfig
+	GRPC               GrpcClientConfig
+	Redis              RedisConfig
+	Logger             LoggerConfig
+	Update             UpdateConfig
+	Env                string `env:"ENV" env-default:"prod"`
+	InstanceID         uuid.UUID
+	AuthServiceMock    bool `env:"AUTH_SERVICE_MOCK" env-default:"false"`
+	AuthMiddlewareMock bool `env:"AUTH_MIDDLEWARE_MOCK" env-default:"false"`
 }
 
 func GetConfig() Config {

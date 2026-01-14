@@ -3,7 +3,7 @@ package streamservermock
 import (
 	"encoding/json"
 	"fmt"
-	"main/pkg/api/model/streamserver"
+	"main/pkg/api/streamserver"
 	"net/http"
 )
 

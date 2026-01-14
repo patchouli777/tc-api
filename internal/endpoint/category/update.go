@@ -7,6 +7,8 @@ import (
 	"main/internal/lib/sl"
 	"math"
 	"time"
+
+	"github.com/RussellLuo/timingwheel"
 )
 
 type livestreamLister interface {
@@ -22,10 +24,13 @@ type CategoryUpdater struct {
 	lsLister livestreamLister
 	lu       listerUpdater
 	log      *slog.Logger
+	wheel    *timingwheel.TimingWheel
 }
 
 func NewUpdater(log *slog.Logger, lsLister livestreamLister, lu listerUpdater) *CategoryUpdater {
-	return &CategoryUpdater{lsLister: lsLister, lu: lu, log: log}
+	wheel := timingwheel.NewTimingWheel(5*time.Second, 16)
+
+	return &CategoryUpdater{lsLister: lsLister, lu: lu, log: log, wheel: wheel}
 }
 
 func (cu *CategoryUpdater) Update(ctx context.Context, timeout time.Duration) {
@@ -58,7 +63,7 @@ func (cu *CategoryUpdater) Update(ctx context.Context, timeout time.Duration) {
 						viewers += lsArr[i].Viewers
 					}
 
-					err = cu.lu.UpdateViewersById(timeoutCtx, int(cat.Id), int(viewers))
+					err = cu.lu.UpdateViewers(timeoutCtx, int(cat.Id), int(viewers))
 					if err != nil {
 						cu.log.Error("update viewers", sl.Err(err), sl.Op(op), slog.String("category", cat.Name))
 					}

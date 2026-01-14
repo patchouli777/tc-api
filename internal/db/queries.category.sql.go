@@ -66,16 +66,50 @@ func (q *Queries) CategoryAddTags(ctx context.Context, arg CategoryAddTagsParams
 	return items, nil
 }
 
-const categoryDelete = `-- name: CategoryDelete :exec
+const categoryDelete = `-- name: CategoryDelete :one
 DELETE FROM
     tc_category
 WHERE
     id = $1
+RETURNING id, name, link, created_at, is_safe, viewers, image
 `
 
-func (q *Queries) CategoryDelete(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, categoryDelete, id)
-	return err
+func (q *Queries) CategoryDelete(ctx context.Context, id int32) (TcCategory, error) {
+	row := q.db.QueryRow(ctx, categoryDelete, id)
+	var i TcCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Link,
+		&i.CreatedAt,
+		&i.IsSafe,
+		&i.Viewers,
+		&i.Image,
+	)
+	return i, err
+}
+
+const categoryDeleteByLink = `-- name: CategoryDeleteByLink :one
+DELETE FROM
+    tc_category
+WHERE
+    link = $1
+RETURNING id, name, link, created_at, is_safe, viewers, image
+`
+
+func (q *Queries) CategoryDeleteByLink(ctx context.Context, link string) (TcCategory, error) {
+	row := q.db.QueryRow(ctx, categoryDeleteByLink, link)
+	var i TcCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Link,
+		&i.CreatedAt,
+		&i.IsSafe,
+		&i.Viewers,
+		&i.Image,
+	)
+	return i, err
 }
 
 const categoryDeleteTags = `-- name: CategoryDeleteTags :exec
@@ -206,7 +240,7 @@ func (q *Queries) CategorySelectMany(ctx context.Context, arg CategorySelectMany
 	return items, nil
 }
 
-const categoryUpdate = `-- name: CategoryUpdate :exec
+const categoryUpdate = `-- name: CategoryUpdate :one
 UPDATE tc_category
 SET
     name = CASE WHEN $1::boolean THEN $2 ELSE name END,
@@ -230,8 +264,8 @@ type CategoryUpdateParams struct {
 	ID             int32
 }
 
-func (q *Queries) CategoryUpdate(ctx context.Context, arg CategoryUpdateParams) error {
-	_, err := q.db.Exec(ctx, categoryUpdate,
+func (q *Queries) CategoryUpdate(ctx context.Context, arg CategoryUpdateParams) (TcCategory, error) {
+	row := q.db.QueryRow(ctx, categoryUpdate,
 		arg.NameDoUpdate,
 		arg.Name,
 		arg.LinkDoUpdate,
@@ -242,5 +276,64 @@ func (q *Queries) CategoryUpdate(ctx context.Context, arg CategoryUpdateParams) 
 		arg.Image,
 		arg.ID,
 	)
-	return err
+	var i TcCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Link,
+		&i.CreatedAt,
+		&i.IsSafe,
+		&i.Viewers,
+		&i.Image,
+	)
+	return i, err
+}
+
+const categoryUpdateByLink = `-- name: CategoryUpdateByLink :one
+UPDATE tc_category
+SET
+    name = CASE WHEN $1::boolean THEN $2 ELSE name END,
+    link = CASE WHEN $3::boolean THEN $4 ELSE link END,
+    is_safe = CASE WHEN $5::boolean THEN $6 ELSE is_safe END,
+    image = CASE WHEN $7::boolean THEN $8 ELSE image END
+WHERE
+    link = $9
+RETURNING id, name, link, created_at, is_safe, viewers, image
+`
+
+type CategoryUpdateByLinkParams struct {
+	NameDoUpdate   bool
+	Name           string
+	LinkDoUpdate   bool
+	Link           string
+	IsSafeDoUpdate bool
+	IsSafe         bool
+	ImageDoUpdate  bool
+	Image          string
+	LinkUpd        string
+}
+
+func (q *Queries) CategoryUpdateByLink(ctx context.Context, arg CategoryUpdateByLinkParams) (TcCategory, error) {
+	row := q.db.QueryRow(ctx, categoryUpdateByLink,
+		arg.NameDoUpdate,
+		arg.Name,
+		arg.LinkDoUpdate,
+		arg.Link,
+		arg.IsSafeDoUpdate,
+		arg.IsSafe,
+		arg.ImageDoUpdate,
+		arg.Image,
+		arg.LinkUpd,
+	)
+	var i TcCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Link,
+		&i.CreatedAt,
+		&i.IsSafe,
+		&i.Viewers,
+		&i.Image,
+	)
+	return i, err
 }

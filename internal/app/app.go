@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	appAuth "main/internal/auth"
 	"main/internal/endpoint/auth"
 	"main/internal/endpoint/category"
 	"main/internal/endpoint/channel"
@@ -50,17 +51,18 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 		return nil
 	}
 
-	srvcs := InitApp(ctx,
+	app := InitApp(ctx,
 		log,
 		cfg.InstanceID.String(),
 		cfg.Env,
 		authClient,
 		rdb,
 		pool)
-	srvcs.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
-	srvcs.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
+	app.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
+	app.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
 
-	handler := CreateHandler(ctx, log, cfg, srvcs)
+	authMw := NewAuthMiddleware(log, cfg.AuthMiddlewareMock)
+	handler := CreateHandler(ctx, log, authMw, app)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", cfg.HTTP.Host, cfg.HTTP.Port),
@@ -72,19 +74,21 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 	return server
 }
 
-func CreateHandler(ctx context.Context, log *slog.Logger, cfg Config, srvcs App) http.Handler {
+func CreateHandler(ctx context.Context, log *slog.Logger, authMw authMw, app *App) http.Handler {
 	mux := http.NewServeMux()
+
 	addRoutes(mux, log,
-		srvcs.Category,
-		srvcs.Livestream,
-		srvcs.Channel,
-		srvcs.Auth,
-		srvcs.Follow,
-		srvcs.User)
+		authMw,
+		app.Category,
+		app.Livestream,
+		app.Channel,
+		app.Auth,
+		app.Follow,
+		app.User)
 
 	panicRecovery := mw.PanicRecovery(log)
-	logging := mw.Logging(ctx, log)
-	return panicRecovery(mw.JSONResponse(mw.CORS(logging(mux))))
+	logging := mw.Logging(log)
+	return mw.RequestID(panicRecovery(mw.JSONResponse(mw.CORS(logging(mux)))))
 }
 
 type App struct {
@@ -93,9 +97,9 @@ type App struct {
 	StreamServerAdapter *livestream.StreamServerAdapter
 	Category            *category.RepositoryImpl
 	CategoryUpdater     *category.CategoryUpdater
-	Follow              *follow.ServiceImpl
-	User                *user.ServiceImpl
-	Channel             *channel.ServiceImpl
+	Follow              *follow.RepositoryImpl
+	User                *user.RepositoryImpl
+	Channel             *channel.RepositoryImpl
 }
 
 func InitApp(ctx context.Context,
@@ -104,13 +108,12 @@ func InitApp(ctx context.Context,
 	env string,
 	client auth.Client,
 	rdb *redis.Client,
-	pool *pgxpool.Pool) App {
+	pool *pgxpool.Pool) *App {
 	livestreamRepo := livestream.NewRepo(rdb, pool)
 	streamServerAdapter := livestream.NewStreamServerAdapter(log, livestreamRepo, instanceID)
-	// livestreamsService := livestream.NewService(livestreamRepo)
 
 	channelDBAdapter := channel.NewAdapter(pool)
-	channelService := channel.NewService(log, channelDBAdapter)
+	channelRepo := channel.NewRepository(log, channelDBAdapter)
 
 	categoryRepo := category.NewRepo(rdb, pool)
 	categoryUpdater := category.NewUpdater(log, livestreamRepo, categoryRepo)
@@ -118,21 +121,30 @@ func InitApp(ctx context.Context,
 	authDBAdapter := auth.NewAdapter(pool)
 	authService := auth.NewService(client, authDBAdapter)
 
-	followService := follow.NewService(pool)
+	followRepo := follow.NewRepository(pool)
 
 	userRepo := user.NewRepository(pool)
-	userService := user.NewService(userRepo)
 
-	return App{
-		// Livestream:          livestreamsService,
+	return &App{
 		Auth:                authService,
 		Livestream:          livestreamRepo,
-		Channel:             channelService,
+		Channel:             channelRepo,
 		Category:            categoryRepo,
 		CategoryUpdater:     categoryUpdater,
-		Follow:              followService,
-		User:                userService,
+		Follow:              followRepo,
+		User:                userRepo,
 		StreamServerAdapter: streamServerAdapter}
+}
+
+type authMw = func(log *slog.Logger, next http.HandlerFunc) http.HandlerFunc
+
+func NewAuthMiddleware(log *slog.Logger, isMock bool) authMw {
+	if isMock {
+		log.Info("Initializating mock auth middleware because AUTH_MIDDLEWARE_MOCK == true")
+		return appAuth.AuthMiddlewareMock
+	} else {
+		return appAuth.AuthMiddleware
+	}
 }
 
 func NewAuthClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfig) (auth.Client, error) {

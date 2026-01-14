@@ -2,7 +2,7 @@ package test
 
 import (
 	"encoding/json"
-	api "main/pkg/api/model/category"
+	api "main/pkg/api/category"
 	"net/http"
 
 	"github.com/stretchr/testify/suite"
