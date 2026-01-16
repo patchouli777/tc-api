@@ -65,9 +65,9 @@ func (r *cache) getByLink(ctx context.Context, link string) (*Category, error) {
 
 func (r *cache) add(ctx context.Context, cat Category) error {
 	cmds, err := r.rdb.TxPipelined(ctx, func(p redis.Pipeliner) error {
-		r.linkMap.addTx(ctx, p, cat.Link, int(cat.Id))                      // nolint:errcheck
-		r.sorted.addTx(ctx, p, int(cat.Viewers), strconv.Itoa(int(cat.Id))) // nolint:errcheck
-		r.categories.addTx(ctx, p, cat)                                     // nolint:errcheck
+		r.linkMap.addTx(ctx, p, cat.Link, int(cat.Id))
+		r.sorted.addTx(ctx, p, int(cat.Viewers), strconv.Itoa(int(cat.Id)))
+		r.categories.addTx(ctx, p, cat)
 		return nil
 	})
 
@@ -116,6 +116,11 @@ func (r *cache) update(ctx context.Context, id int, upd CategoryUpdate) error {
 func (r *cache) updateViewers(ctx context.Context, id int, viewers int) error {
 	idStr := strconv.Itoa(id)
 	err := r.categories.updateViewers(ctx, idStr, viewers)
+	if err != nil {
+		return err
+	}
+
+	err = r.sorted.updateViewers(ctx, idStr, int32(viewers))
 	if err != nil {
 		return err
 	}

@@ -2,9 +2,7 @@ package livestream
 
 import (
 	"context"
-	"log/slog"
-	"main/internal/db"
-	"main/internal/lib/sl"
+	"main/internal/external/db"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -82,17 +80,17 @@ func (r *RepositoryImpl) Create(ctx context.Context, cr LivestreamCreate) (*Live
 
 func (r *RepositoryImpl) UpdateViewers(ctx context.Context, user string, viewers int32) error {
 	// TODO: batch updates
-	go func() {
-		q := QueriesAdapter{queries: db.New(r.pool)}
+	// go func() {
+	// 	q := QueriesAdapter{queries: db.New(r.pool)}
 
-		err := q.UpdateViewers(ctx, db.LivestreamUpdateViewersParams{
-			Viewers: viewers,
-			Name:    user,
-		})
-		if err != nil {
-			slog.Error("unable to update viewers", sl.Err(err))
-		}
-	}()
+	// 	err := q.UpdateViewers(ctx, db.LivestreamUpdateViewersParams{
+	// 		Viewers: viewers,
+	// 		Name:    user,
+	// 	})
+	// 	if err != nil {
+	// 		slog.Error("unable to update viewers", sl.Err(err))
+	// 	}
+	// }()
 
 	return r.cache.updateViewers(ctx, user, viewers)
 }

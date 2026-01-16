@@ -97,9 +97,6 @@ type setupUser struct {
 }
 
 func usersGet(count int) []setupUser {
-	// root := util.GetProjectRoot()
-
-	// entries, err := os.ReadDir(root + "/static/avatars")
 	entries, err := os.ReadDir("./static/avatars")
 	if err != nil {
 		log.Print("couldn't load avatars")

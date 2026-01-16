@@ -15,9 +15,9 @@ type categoryStore struct {
 	rdb *redis.Client
 }
 
-func (r *categoryStore) addTx(ctx context.Context, tx redis.Pipeliner, cat Category) error {
+func (r *categoryStore) addTx(ctx context.Context, tx redis.Pipeliner, cat Category) *redis.IntCmd {
 	idStr := strconv.Itoa(int(cat.Id))
-	return tx.HSet(ctx, r.key(idStr), cat).Err()
+	return tx.HSet(ctx, r.key(idStr), cat)
 }
 
 // TODO: is there any better way???
@@ -89,8 +89,8 @@ func (r *categoryStore) update(ctx context.Context, id string, values map[string
 	return r.rdb.HSet(ctx, r.key(id), values).Err()
 }
 
-func (r *categoryStore) deleteTx(ctx context.Context, tx redis.Pipeliner, id string) error {
-	return tx.Del(ctx, r.key(id)).Err()
+func (r *categoryStore) deleteTx(ctx context.Context, tx redis.Pipeliner, id string) *redis.IntCmd {
+	return tx.Del(ctx, r.key(id))
 }
 
 func (r *categoryStore) key(id string) string {

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -16,18 +17,35 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-type AuthClientImpl struct {
+type ClientImpl struct {
 	api auth_v1.AuthClient
 	log *slog.Logger
 }
 
-func NewAuthClient(
+type Token string
+
+func (m Token) MarshalBinary() ([]byte, error) {
+	return json.Marshal(m)
+}
+
+type UserInfo struct {
+	Id       int32
+	Username string
+	Role     string
+}
+
+type TokenPair struct {
+	Access  Token
+	Refresh Token
+}
+
+func NewClient(
 	log *slog.Logger,
 	host string,
 	port string,
 	timeout time.Duration,
 	retriesCount int,
-) (*AuthClientImpl, error) {
+) (*ClientImpl, error) {
 	retryOpts := []grpcretry.CallOption{
 		grpcretry.WithCodes(codes.NotFound, codes.Aborted, codes.DeadlineExceeded),
 		grpcretry.WithMax(uint(retriesCount)),
@@ -49,13 +67,13 @@ func NewAuthClient(
 	}
 
 	grpcClient := auth_v1.NewAuthClient(cc)
-	return &AuthClientImpl{
+	return &ClientImpl{
 		api: grpcClient,
 		log: log,
 	}, nil
 }
 
-func (c *AuthClientImpl) GetRefresh(ctx context.Context, ui UserInfo) (*Token, error) {
+func (c *ClientImpl) GetRefresh(ctx context.Context, ui UserInfo) (*Token, error) {
 	res, err := c.api.NewRefresh(ctx, &auth_v1.NewRefreshRequest{Username: ui.Username})
 	if err != nil {
 		return nil, err
@@ -64,7 +82,7 @@ func (c *AuthClientImpl) GetRefresh(ctx context.Context, ui UserInfo) (*Token, e
 	return (*Token)(&res.Token), nil
 }
 
-func (c *AuthClientImpl) GetAccess(ctx context.Context, ui UserInfo) (*Token, error) {
+func (c *ClientImpl) GetAccess(ctx context.Context, ui UserInfo) (*Token, error) {
 	res, err := c.api.NewAccess(ctx, &auth_v1.NewAccessRequest{Username: ui.Username})
 	if err != nil {
 		return nil, err
@@ -73,7 +91,7 @@ func (c *AuthClientImpl) GetAccess(ctx context.Context, ui UserInfo) (*Token, er
 	return (*Token)(&res.Token), nil
 }
 
-func (c *AuthClientImpl) GetPair(ctx context.Context, ui UserInfo) (*TokenPair, error) {
+func (c *ClientImpl) GetPair(ctx context.Context, ui UserInfo) (*TokenPair, error) {
 	access, err := c.GetAccess(ctx, ui)
 	if err != nil {
 		return nil, err

@@ -3,7 +3,7 @@ package category
 import (
 	"context"
 	"errors"
-	"main/internal/db"
+	"main/internal/external/db"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -90,6 +90,7 @@ func (q *QueriesAdapter) Delete(ctx context.Context, id int32) error {
 	return nil
 }
 
+// TODO: return nil if no rows?
 func (q *QueriesAdapter) DeleteByLink(ctx context.Context, link string) (db.TcCategory, error) {
 	deleted, err := q.queries.CategoryDeleteByLink(ctx, link)
 

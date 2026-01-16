@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"main/internal/db"
+	"main/internal/external/db"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"

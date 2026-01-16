@@ -82,7 +82,7 @@ func TestMain(m *testing.M) {
 		}
 	}()
 
-	srvcs := app.InitApp(ctx, log,
+	services := app.InitApp(ctx, log,
 		cfg.InstanceID.String(),
 		cfg.Env,
 		grpcClient,
@@ -91,17 +91,17 @@ func TestMain(m *testing.M) {
 
 	setup.RecreateSchema(pgpool, rclient)
 	// setup.Populate(ctx, pgpool,
-	// 	srvcs.Auth,
-	// 	srvcs.StreamServerAdapter,
-	// 	srvcs.Category,
-	// 	srvcs.Follow,
-	// 	srvcs.User)
-	// srvcs.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
-	// srvcs.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
+	// 	services.Auth,
+	// 	services.StreamServerAdapter,
+	// 	services.Category,
+	// 	services.Follow,
+	// 	services.User)
+	// services.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
+	// services.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
 
 	authMw := app.NewAuthMiddleware(log, false)
 
-	handler := app.CreateHandler(ctx, log, authMw, srvcs)
+	handler := app.CreateHandler(ctx, log, authMw, services)
 	ts = httptest.NewServer(handler)
 	defer ts.Close()
 

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"main/internal/lib/streamservermock"
+	streamservermock "main/internal/external/streamserver/mock"
 	"os"
 )
 

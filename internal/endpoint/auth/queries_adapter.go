@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
-	"main/internal/db"
+	"main/internal/external/db"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

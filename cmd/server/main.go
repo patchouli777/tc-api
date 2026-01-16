@@ -38,7 +38,6 @@ func main() {
 	cfg := app.GetConfig()
 
 	log := app.NewLogger(cfg.Logger)
-	log.With(slog.String("env", cfg.Env))
 	slog.SetDefault(log)
 
 	server := app.New(ctx, log, cfg)

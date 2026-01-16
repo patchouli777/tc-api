@@ -151,8 +151,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	claims := ctx.Value(auth.AuthContextKey{})
-	user, ok := claims.(*auth.Claims)
+	user, ok := auth.FromContext(ctx)
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
@@ -219,16 +218,18 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	claims := ctx.Value(auth.AuthContextKey{})
-	user, ok := claims.(*auth.Claims)
+	user, ok := auth.FromContext(ctx)
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
-	if user.Id != int32(idInt) {
-		handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
-		return
+	// TODO: int check instead of username + staff check
+	if user.Role != auth.RoleStaff {
+		if user.Id != int32(idInt) {
+			handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)
+			return
+		}
 	}
 
 	var req api.DeleteRequest
@@ -249,14 +250,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	const op = "list users"
 
 	ctx := r.Context()
-	claims := ctx.Value(auth.AuthContextKey{})
-	user, ok := claims.(*auth.Claims)
+	user, ok := auth.FromContext(ctx)
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
-	if user.Role != "staff" {
+	if user.Role != auth.RoleStaff {
 		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}

@@ -85,6 +85,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	extended := r.URL.Query().Get("extended")
+	println(extended)
 	if extended == "true" {
 		extendedList, err := h.r.ListExtended(ctx, follower)
 		if err != nil {
@@ -134,8 +135,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	username := r.PathValue("username")
 	ctx := r.Context()
-	claims := ctx.Value(auth.AuthContextKey{})
-	user, ok := claims.(*auth.Claims)
+	user, ok := auth.FromContext(ctx)
 
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusUnauthorized, handler.MsgIdentity)
@@ -182,8 +182,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	username := r.PathValue("username")
 	ctx := r.Context()
-	claims := ctx.Value(auth.AuthContextKey{})
-	user, ok := claims.(*auth.Claims)
+	user, ok := auth.FromContext(ctx)
 
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusUnauthorized, handler.MsgIdentity)

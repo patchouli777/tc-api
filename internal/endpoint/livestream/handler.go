@@ -175,6 +175,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	for i, ls := range livestreams {
 		listResponse.Livestreams[i] = api.ListResponseItem{
+			Id:       int(ls.Id),
 			Username: ls.UserName,
 			Avatar:   ls.UserAvatar,
 			Category: api.LivestreamCategory{

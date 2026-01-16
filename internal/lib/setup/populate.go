@@ -9,8 +9,8 @@ import (
 	"main/internal/endpoint/auth"
 	"main/internal/endpoint/category"
 	"main/internal/endpoint/follow"
-	"main/internal/endpoint/livestream"
 	"main/internal/endpoint/user"
+	"main/internal/external/streamserver"
 	livestreamApi "main/pkg/api/livestream"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,7 +19,7 @@ import (
 func Populate(ctx context.Context,
 	pool *pgxpool.Pool,
 	as *auth.ServiceImpl,
-	ls *livestream.StreamServerAdapter,
+	ls *streamserver.Adapter,
 	cr *category.RepositoryImpl,
 	fs *follow.RepositoryImpl,
 	us *user.RepositoryImpl) {
@@ -55,13 +55,7 @@ func addCategories(ctx context.Context, cr *category.RepositoryImpl) {
 func addUsers(ctx context.Context, pool *pgxpool.Pool) {
 	slog.Info("adding users")
 
-	conn, err := pool.Acquire(ctx)
-	if err != nil {
-		log.Fatalf("unable to acquire connection: %v", err)
-		return
-	}
-
-	r, err := conn.Query(ctx, usersToSQL(users))
+	r, err := pool.Query(ctx, usersToSQL(users))
 	if err != nil {
 		fmt.Println(usersToSQL(users))
 		log.Fatalf("unable to add users: %v", err)
@@ -71,7 +65,7 @@ func addUsers(ctx context.Context, pool *pgxpool.Pool) {
 	slog.Info("users added")
 }
 
-func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *livestream.StreamServerAdapter) {
+func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *streamserver.Adapter) {
 	slog.Info("starting livestreams")
 
 	cl := livestreamApi.NewStreamServerClient()
@@ -89,13 +83,7 @@ func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *live
 func addTags(ctx context.Context, pool *pgxpool.Pool) {
 	slog.Info("adding tags")
 
-	conn, err := pool.Acquire(ctx)
-	if err != nil {
-		log.Fatalf("unable to acquire connection: %v", err)
-		return
-	}
-
-	r, err := conn.Query(ctx, tagsToSQL(tags))
+	r, err := pool.Query(ctx, tagsToSQL(tags))
 	if err != nil {
 		log.Fatalf("unable to add tags: %v", err)
 	}

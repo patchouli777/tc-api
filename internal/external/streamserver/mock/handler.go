@@ -3,16 +3,18 @@ package streamservermock
 import (
 	"encoding/json"
 	"fmt"
-	"main/pkg/api/streamserver"
+	"log/slog"
+	"main/internal/external/streamserver"
 	"net/http"
 )
 
-func Get(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
+func Get(repo *repository) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 
-		data, err := srv.Get(r.Context(), id)
+		data, err := repo.Get(r.Context(), id)
 		if err != nil {
+			slog.Error("not found", slog.String("user id", id))
 			json.NewEncoder(w).Encode(struct{ Error string }{Error: err.Error()})
 			return
 		}
@@ -25,7 +27,7 @@ func Get(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func Post(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
+func Post(repo *repository) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req streamserver.PostRequest
 
@@ -36,7 +38,7 @@ func Post(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = srv.Start(r.Context(), req.Channel)
+		err = repo.Start(r.Context(), req.Channel)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -50,9 +52,9 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("delete not implemented")
 }
 
-func List(srv *StreamServerMock) func(w http.ResponseWriter, r *http.Request) {
+func List(repo *repository) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		data, err := srv.List(r.Context())
+		data, err := repo.List(r.Context())
 		if err != nil {
 			json.NewEncoder(w).Encode(struct{ Error string }{Error: err.Error()})
 			return

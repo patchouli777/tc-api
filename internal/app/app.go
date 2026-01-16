@@ -11,11 +11,14 @@ import (
 	"main/internal/endpoint/follow"
 	"main/internal/endpoint/livestream"
 	"main/internal/endpoint/user"
+	authExternal "main/internal/external/auth"
+	"main/internal/external/streamserver"
 	"main/internal/lib/mw"
 	"main/internal/lib/sl"
 	"net/http"
 	"os"
 
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/redis/go-redis/v9/maintnotifications"
@@ -58,11 +61,37 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 		authClient,
 		rdb,
 		pool)
-	app.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
-	app.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
 
 	authMw := NewAuthMiddleware(log, cfg.AuthMiddlewareMock)
 	handler := CreateHandler(ctx, log, authMw, app)
+
+	taskqserv := asynq.NewServer(
+		asynq.RedisClientOpt{Addr: fmt.Sprintf("%s:%s", "0.0.0.0", "6379")},
+		asynq.Config{Concurrency: 10},
+	)
+
+	sched := asynq.NewScheduler(asynq.RedisClientOpt{
+		Addr: fmt.Sprintf("%s:%s", "0.0.0.0", "6379")}, nil)
+
+	asyncqMux := asynq.NewServeMux()
+	updSched := livestream.NewUpdateScheduler(log, app.StreamServerAdapter, app.Livestream, sched)
+	asyncqMux.HandleFunc(livestream.TypeLivestreamUpdate, updSched.HandleUpdateTask)
+
+	go func() {
+		if err := taskqserv.Run(asyncqMux); err != nil {
+			log.Error("asynq server down")
+		}
+	}()
+
+	go func() {
+		if err := sched.Run(); err != nil {
+			log.Error("scheduler down", sl.Err(err))
+			return
+		}
+	}()
+
+	app.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
+	go updSched.Update(ctx, cfg.Update.LivestreamsTimeout)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", cfg.HTTP.Host, cfg.HTTP.Port),
@@ -94,8 +123,8 @@ func CreateHandler(ctx context.Context, log *slog.Logger, authMw authMw, app *Ap
 type App struct {
 	Auth                *auth.ServiceImpl
 	Livestream          *livestream.RepositoryImpl
-	StreamServerAdapter *livestream.StreamServerAdapter
 	Category            *category.RepositoryImpl
+	StreamServerAdapter *streamserver.Adapter
 	CategoryUpdater     *category.CategoryUpdater
 	Follow              *follow.RepositoryImpl
 	User                *user.RepositoryImpl
@@ -110,7 +139,6 @@ func InitApp(ctx context.Context,
 	rdb *redis.Client,
 	pool *pgxpool.Pool) *App {
 	livestreamRepo := livestream.NewRepo(rdb, pool)
-	streamServerAdapter := livestream.NewStreamServerAdapter(log, livestreamRepo, instanceID)
 
 	channelDBAdapter := channel.NewAdapter(pool)
 	channelRepo := channel.NewRepository(log, channelDBAdapter)
@@ -124,6 +152,8 @@ func InitApp(ctx context.Context,
 	followRepo := follow.NewRepository(pool)
 
 	userRepo := user.NewRepository(pool)
+
+	streamServerAdapter := streamserver.NewAdapter(log)
 
 	return &App{
 		Auth:                authService,
@@ -149,7 +179,7 @@ func NewAuthMiddleware(log *slog.Logger, isMock bool) authMw {
 
 func NewAuthClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfig) (auth.Client, error) {
 	if env == envProd {
-		return auth.NewAuthClient(log,
+		return authExternal.NewClient(log,
 			cfg.Host,
 			cfg.Port,
 			cfg.Timeout,
@@ -157,16 +187,16 @@ func NewAuthClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConf
 	}
 
 	if !isMock {
-		log.Info("Initializating real grpc client because AUTH_SERVICE_MOCK == false")
-		return auth.NewAuthClient(log,
+		log.Info("Initializating real grpc auth client because AUTH_SERVICE_MOCK == false")
+		return authExternal.NewClient(log,
 			cfg.Host,
 			cfg.Port,
 			cfg.Timeout,
 			cfg.Retries)
 	}
 
-	log.Info("ENV is not prod and AUTH_SERVICE_MOCK is not false. Initializing mock grpc client.")
-	return &auth.AuthClientMock{}, nil
+	log.Info("ENV is not prod and AUTH_SERVICE_MOCK is not false. Initializing mock grpc auth client.")
+	return &authExternal.ClientMock{}, nil
 }
 
 func NewLogger(cfg LoggerConfig) *slog.Logger {

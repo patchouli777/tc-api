@@ -155,7 +155,8 @@ LEFT JOIN
 WHERE
     u.name = $1
 ORDER BY
-    f.is_live ASC, ls.viewers DESC
+    f.is_live DESC,
+    ls.viewers DESC
 LIMIT 50
 `
 

@@ -8,9 +8,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type AuthClientMock struct{}
+type ClientMock struct{}
 
-func (s *AuthClientMock) GetRefresh(ctx context.Context, ui UserInfo) (*Token, error) {
+func (s *ClientMock) GetRefresh(ctx context.Context, ui UserInfo) (*Token, error) {
 	now := time.Now()
 	refreshExp := now.Add(refreshExpirationTime)
 
@@ -24,7 +24,7 @@ func (s *AuthClientMock) GetRefresh(ctx context.Context, ui UserInfo) (*Token, e
 	return &tok, nil
 }
 
-func (s *AuthClientMock) GetAccess(ctx context.Context, ui UserInfo) (*Token, error) {
+func (s *ClientMock) GetAccess(ctx context.Context, ui UserInfo) (*Token, error) {
 	now := time.Now()
 	accessExp := now.Add(accessExpirationTime)
 
@@ -38,7 +38,7 @@ func (s *AuthClientMock) GetAccess(ctx context.Context, ui UserInfo) (*Token, er
 	return &tok, nil
 }
 
-func (s *AuthClientMock) GetPair(ctx context.Context, ui UserInfo) (*TokenPair, error) {
+func (s *ClientMock) GetPair(ctx context.Context, ui UserInfo) (*TokenPair, error) {
 	return createPair(ui)
 }
 

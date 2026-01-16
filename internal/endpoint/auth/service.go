@@ -3,11 +3,12 @@ package auth
 import (
 	"context"
 	"errors"
-	"main/internal/db"
+	ext "main/internal/external/auth"
+	"main/internal/external/db"
 )
 
 type Client interface {
-	GetPair(ctx context.Context, ui UserInfo) (*TokenPair, error)
+	GetPair(ctx context.Context, ui ext.UserInfo) (*ext.TokenPair, error)
 }
 
 type ServiceImpl struct {
@@ -29,12 +30,12 @@ func (s *ServiceImpl) SignIn(ctx context.Context, username, password string) (*T
 		return nil, err
 	}
 
-	pair, err := s.ac.GetPair(ctx, UserInfo{Id: ui.ID, Username: username, Role: string(ui.AppRole)})
+	pair, err := s.ac.GetPair(ctx, ext.UserInfo{Id: ui.ID, Username: username, Role: string(ui.AppRole)})
 	if err != nil {
 		return nil, err
 	}
 
-	return pair, nil
+	return &TokenPair{Access: Token(pair.Access), Refresh: Token(pair.Refresh)}, nil
 }
 
 func (s *ServiceImpl) SignUp(ctx context.Context, email, username, password string) (*TokenPair, error) {
@@ -43,10 +44,10 @@ func (s *ServiceImpl) SignUp(ctx context.Context, email, username, password stri
 		return nil, err
 	}
 
-	pair, err := s.ac.GetPair(ctx, UserInfo{Username: username, Role: "user"})
+	pair, err := s.ac.GetPair(ctx, ext.UserInfo{Username: username, Role: "user"})
 	if err != nil {
 		return nil, err
 	}
 
-	return pair, nil
+	return &TokenPair{Access: Token(pair.Access), Refresh: Token(pair.Refresh)}, nil
 }

@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"main/internal/app"
-	"main/internal/endpoint/auth"
+	"main/internal/external/auth"
 	"main/internal/lib/setup"
 	"main/internal/lib/sl"
 
@@ -47,19 +47,19 @@ func main() {
 
 	setup.RecreateSchema(pool, rdb)
 
-	srvcs := app.InitApp(ctx, log,
+	app := app.InitApp(ctx, log,
 		cfg.InstanceID.String(),
 		cfg.Env,
-		&auth.AuthClientMock{},
+		&auth.ClientMock{},
 		rdb,
 		pool)
 
 	setup.Populate(ctx, pool,
-		srvcs.Auth,
-		srvcs.StreamServerAdapter,
-		srvcs.Category,
-		srvcs.Follow,
-		srvcs.User)
+		app.Auth,
+		app.StreamServerAdapter,
+		app.Category,
+		app.Follow,
+		app.User)
 
 	os.Exit(0)
 }

@@ -2,7 +2,7 @@ package channel
 
 import (
 	"context"
-	"main/internal/db"
+	"main/internal/external/db"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

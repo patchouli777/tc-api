@@ -34,6 +34,7 @@ type ListResponse struct {
 	Livestreams []ListResponseItem `json:"livestreams"`
 }
 type ListResponseItem struct {
+	Id        int                `json:"id"`
 	Username  string             `json:"username"`
 	Title     string             `json:"title"`
 	Avatar    string             `json:"avatar"`

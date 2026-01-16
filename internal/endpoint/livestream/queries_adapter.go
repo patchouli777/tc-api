@@ -2,7 +2,7 @@ package livestream
 
 import (
 	"context"
-	"main/internal/db"
+	"main/internal/external/db"
 )
 
 type QueriesAdapter struct {

@@ -3,7 +3,7 @@ package follow
 import (
 	"context"
 	"fmt"
-	"main/internal/db"
+	"main/internal/external/db"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -69,6 +69,8 @@ func (r *RepositoryImpl) ListExtended(ctx context.Context, follower string) ([]F
 			IsLive:   f.IsLive.Bool,
 		}
 	}
+
+	fmt.Println("following", following[0])
 
 	return following, nil
 }

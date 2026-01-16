@@ -211,14 +211,14 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	cl := ctx.Value(auth.AuthContextKey{})
-	claims, ok := cl.(*auth.Claims)
+	user, ok := cl.(*auth.Claims)
 
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
-	if claims.Role != "staff" {
+	if user.Role != auth.RoleStaff {
 		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.ErrNotAllowed.Error())
 		return
 	}
@@ -274,14 +274,14 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	cl := ctx.Value(auth.AuthContextKey{})
-	claims, ok := cl.(*auth.Claims)
+	user, ok := cl.(*auth.Claims)
 
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
-	if claims.Role != "staff" {
+	if user.Role != auth.RoleStaff {
 		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
@@ -366,7 +366,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.Role != "staff" {
+	if claims.Role != auth.RoleStaff {
 		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.ErrNotAllowed.Error())
 		return
 	}
