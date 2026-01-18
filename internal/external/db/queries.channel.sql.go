@@ -20,7 +20,7 @@ SELECT
     first_livestream,
     last_livestream,
     offline_background AS background,
-    avatar,
+    pfp,
     description,
     links,
     tags
@@ -38,7 +38,7 @@ type ChannelSelectRow struct {
 	FirstLivestream pgtype.Date
 	LastLivestream  pgtype.Date
 	Background      string
-	Avatar          pgtype.Text
+	Pfp             pgtype.Text
 	Description     pgtype.Text
 	Links           []string
 	Tags            []string
@@ -55,7 +55,7 @@ func (q *Queries) ChannelSelect(ctx context.Context, name string) (ChannelSelect
 		&i.FirstLivestream,
 		&i.LastLivestream,
 		&i.Background,
-		&i.Avatar,
+		&i.Pfp,
 		&i.Description,
 		&i.Links,
 		&i.Tags,

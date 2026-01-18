@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"main/internal/app"
-	"main/internal/endpoint/auth"
+	"main/internal/auth"
 	"main/internal/lib/setup"
 	"main/internal/lib/sl"
 	"main/internal/lib/streamservermock"
@@ -82,7 +82,8 @@ func TestMain(m *testing.M) {
 		}
 	}()
 
-	services := app.InitApp(ctx, log,
+	services := app.NewApp(ctx,
+		log,
 		cfg.InstanceID.String(),
 		cfg.Env,
 		grpcClient,

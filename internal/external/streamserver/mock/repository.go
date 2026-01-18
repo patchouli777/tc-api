@@ -1,4 +1,4 @@
-package streamservermock
+package mock
 
 import (
 	"context"
@@ -11,7 +11,7 @@ type repository struct {
 }
 
 func newRepository() *repository {
-	return &repository{livestreams: []livestream{}}
+	return &repository{livestreams: make([]livestream, 0)}
 }
 
 func (u *repository) List(ctx context.Context) ([]livestream, error) {

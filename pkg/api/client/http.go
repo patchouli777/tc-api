@@ -1,4 +1,4 @@
-package client
+package baseclient
 
 import (
 	"bytes"
@@ -6,11 +6,15 @@ import (
 	"net/http"
 )
 
-type BaseClient struct {
+type Client struct {
 	Client *http.Client
 }
 
-func (c *BaseClient) Get(url string) (*http.Request, error) {
+func NewClient() *Client {
+	return &Client{Client: &http.Client{}}
+}
+
+func (c *Client) Get(url string) (*http.Request, error) {
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer([]byte{}))
 	if err != nil {
 		return nil, err
@@ -19,7 +23,7 @@ func (c *BaseClient) Get(url string) (*http.Request, error) {
 	return req, nil
 }
 
-func (c *BaseClient) Post(url string, data any) (*http.Request, error) {
+func (c *Client) Post(url string, data any) (*http.Request, error) {
 	bs, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -35,7 +39,7 @@ func (c *BaseClient) Post(url string, data any) (*http.Request, error) {
 	return req, err
 }
 
-func (c *BaseClient) Patch(url string, data any) (*http.Request, error) {
+func (c *Client) Patch(url string, data any) (*http.Request, error) {
 	bs, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -51,7 +55,7 @@ func (c *BaseClient) Patch(url string, data any) (*http.Request, error) {
 	return req, err
 }
 
-func (c *BaseClient) Delete(url string, data any) (*http.Request, error) {
+func (c *Client) Delete(url string, data any) (*http.Request, error) {
 	bs, err := json.Marshal(data)
 	if err != nil {
 		return nil, err

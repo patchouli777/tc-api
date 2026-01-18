@@ -14,7 +14,7 @@ type GetRequest struct {
 type GetResponse struct {
 	Id            int                `json:"id"`
 	Username      string             `json:"username"`
-	Avatar        string             `json:"avatar"`
+	Pfp           string             `json:"pfp"`
 	Title         string             `json:"title"`
 	StartedAt     int                `json:"started_at"`
 	IsLive        bool               `json:"is_live"`
@@ -22,7 +22,7 @@ type GetResponse struct {
 	Thumbnail     string             `json:"thumbnail"`
 	IsFollowing   bool               `json:"is_following"`
 	IsSubscriber  bool               `json:"is_subscriber"`
-	Viewers       int32              `json:"viewers"`
+	Viewers       int                `json:"viewers"`
 	Category      LivestreamCategory `json:"category"`
 }
 
@@ -37,10 +37,10 @@ type ListResponseItem struct {
 	Id        int                `json:"id"`
 	Username  string             `json:"username"`
 	Title     string             `json:"title"`
-	Avatar    string             `json:"avatar"`
+	Pfp       string             `json:"pfp"`
 	StartedAt int                `json:"started_at"`
 	Thumbnail string             `json:"thumbnail"`
-	Viewers   int32              `json:"viewers"`
+	Viewers   int                `json:"viewers"`
 	Category  LivestreamCategory `json:"category"`
 	// IsMultistream bool               `json:"is_multistream"`
 	// IsPartner     bool   `json:"is_partner"`

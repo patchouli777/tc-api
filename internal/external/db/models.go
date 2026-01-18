@@ -117,7 +117,7 @@ type TcLivestream struct {
 	IDUser        int32
 	IDCategory    int32
 	Viewers       int32
-	Title         string
+	Title         pgtype.Text
 	StartedAt     pgtype.Timestamptz
 	IsMultistream bool
 }
@@ -154,12 +154,14 @@ type TcUser struct {
 	LastLivestream    pgtype.Date
 	StreamToken       pgtype.Text
 	IsLive            bool
-	Avatar            pgtype.Text
+	Pfp               pgtype.Text
 	OfflineBackground string
 	Description       pgtype.Text
 	Links             []string
 	Tags              []string
 	AppRole           AppRoleEnum
+	IDCategory        pgtype.Int4
+	Title             pgtype.Text
 }
 
 type TcUserChatEvent struct {

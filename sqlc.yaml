@@ -4,72 +4,72 @@ servers:
   uri: "postgres://cherry:123@localhost:5432/baklava"
 sql:
   - engine: "postgresql"
-    queries: "internal/endpoint/category/queries.category.sql"
+    queries: "internal/category/storage/queries.category.sql"
     database:
       managed: true
-    schema: "internal/db/scripts/schema.sql"
+    schema: "internal/external/db/scripts/schema.sql"
     gen:
       go:
         package: "db"
-        out: "internal/db"
+        out: "internal/external/db"
         sql_package: "pgx/v5"
 
 
   - engine: "postgresql"
-    queries: "internal/endpoint/livestream/queries.livestream.sql"
+    queries: "internal/livestream/storage/queries.livestream.sql"
     database:
       managed: true
-    schema: "internal/db/scripts/schema.sql"
+    schema: "internal/external/db/scripts/schema.sql"
     gen:
       go:
         package: "db"
-        out: "internal/db"
+        out: "internal/external/db"
         sql_package: "pgx/v5"
 
 
   - engine: "postgresql"
-    queries: "internal/endpoint/auth/queries.auth.sql"
+    queries: "internal/auth/queries.auth.sql"
     database:
       managed: true
-    schema: "internal/db/scripts/schema.sql"
+    schema: "internal/external/db/scripts/schema.sql"
     gen:
       go:
         package: "db"
-        out: "internal/db"
+        out: "internal/external/db"
         sql_package: "pgx/v5"
 
 
   - engine: "postgresql"
-    queries: "internal/endpoint/follow/queries.follow.sql"
+    queries: "internal/follow/queries.follow.sql"
     database:
       managed: true
-    schema: "internal/db/scripts/schema.sql"
+    schema: "internal/external/db/scripts/schema.sql"
     gen:
       go:
         package: "db"
-        out: "internal/db"
+        out: "internal/external/db"
         sql_package: "pgx/v5"
 
 
   - engine: "postgresql"
-    queries: "internal/endpoint/channel/queries.channel.sql"
+    queries: "internal/channel/queries.channel.sql"
     database:
       managed: true
-    schema: "internal/db/scripts/schema.sql"
+    schema: "internal/external/db/scripts/schema.sql"
     gen:
       go:
         package: "db"
-        out: "internal/db"
+        out: "internal/external/db"
         sql_package: "pgx/v5"
 
 
   - engine: "postgresql"
-    queries: "internal/endpoint/user/queries.user.sql"
+    queries: "internal/user/queries.user.sql"
     database:
       managed: true
-    schema: "internal/db/scripts/schema.sql"
+    schema: "internal/external/db/scripts/schema.sql"
     gen:
       go:
         package: "db"
-        out: "internal/db"
+        out: "internal/external/db"
         sql_package: "pgx/v5"

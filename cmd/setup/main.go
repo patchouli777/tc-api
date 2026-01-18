@@ -47,19 +47,24 @@ func main() {
 
 	setup.RecreateSchema(pool, rdb)
 
-	app := app.InitApp(ctx, log,
-		cfg.InstanceID.String(),
-		cfg.Env,
-		&auth.ClientMock{},
+	app := app.NewApp(ctx,
+		log,
 		rdb,
-		pool)
+		pool,
+		&auth.ClientMock{},
+		cfg.Env,
+		cfg.InstanceID.String(),
+		cfg.StreamServer,
+		cfg.Asynq)
 
+	streamServerBaseUrl := fmt.Sprintf("http://%s:%s%s", cfg.StreamServer.Host, cfg.StreamServer.Port, cfg.StreamServer.Endpoint)
 	setup.Populate(ctx, pool,
-		app.Auth,
+		app.AuthService,
 		app.StreamServerAdapter,
-		app.Category,
-		app.Follow,
-		app.User)
+		app.CategoryRepo,
+		app.FollowRepo,
+		app.UserRepo,
+		streamServerBaseUrl)
 
 	os.Exit(0)
 }

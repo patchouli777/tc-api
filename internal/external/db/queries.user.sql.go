@@ -27,7 +27,7 @@ const userInsert = `-- name: UserInsert :one
 INSERT INTO tc_user (
     name,
     password,
-    avatar)
+    pfp)
 VALUES (
     $1,
     $2,
@@ -38,11 +38,11 @@ RETURNING id
 type UserInsertParams struct {
 	Name     string
 	Password string
-	Avatar   pgtype.Text
+	Pfp      pgtype.Text
 }
 
 func (q *Queries) UserInsert(ctx context.Context, arg UserInsertParams) (int32, error) {
-	row := q.db.QueryRow(ctx, userInsert, arg.Name, arg.Password, arg.Avatar)
+	row := q.db.QueryRow(ctx, userInsert, arg.Name, arg.Password, arg.Pfp)
 	var id int32
 	err := row.Scan(&id)
 	return id, err
@@ -52,7 +52,7 @@ const userSelect = `-- name: UserSelect :one
 SELECT
     id,
     name,
-    avatar,
+    pfp,
     is_banned,
     is_partner,
     first_livestream,
@@ -66,7 +66,7 @@ WHERE
 type UserSelectRow struct {
 	ID              int32
 	Name            string
-	Avatar          pgtype.Text
+	Pfp             pgtype.Text
 	IsBanned        pgtype.Bool
 	IsPartner       pgtype.Bool
 	FirstLivestream pgtype.Date
@@ -79,7 +79,7 @@ func (q *Queries) UserSelect(ctx context.Context, id int32) (UserSelectRow, erro
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
-		&i.Avatar,
+		&i.Pfp,
 		&i.IsBanned,
 		&i.IsPartner,
 		&i.FirstLivestream,
@@ -92,7 +92,7 @@ const userSelectByUsername = `-- name: UserSelectByUsername :one
 SELECT
     id,
     name,
-    avatar,
+    pfp,
     is_banned,
     is_partner,
     first_livestream,
@@ -106,7 +106,7 @@ WHERE
 type UserSelectByUsernameRow struct {
 	ID              int32
 	Name            string
-	Avatar          pgtype.Text
+	Pfp             pgtype.Text
 	IsBanned        pgtype.Bool
 	IsPartner       pgtype.Bool
 	FirstLivestream pgtype.Date
@@ -119,7 +119,7 @@ func (q *Queries) UserSelectByUsername(ctx context.Context, name string) (UserSe
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
-		&i.Avatar,
+		&i.Pfp,
 		&i.IsBanned,
 		&i.IsPartner,
 		&i.FirstLivestream,
@@ -136,11 +136,11 @@ SET
     password   = CASE WHEN $3::boolean THEN $4 ELSE password END,
     is_banned  = CASE WHEN $5::boolean THEN $6 ELSE is_banned END,
     is_partner = CASE WHEN $7::boolean THEN $8 ELSE is_partner END,
-    avatar     = CASE WHEN $9::boolean THEN $10 ELSE avatar END,
+    pfp        = CASE WHEN $9::boolean THEN $10 ELSE pfp END,
     updated_at = CURRENT_DATE
 WHERE
     id = $11
-RETURNING id, name, password, created_at, updated_at, is_banned, is_partner, first_livestream, last_livestream, stream_token, is_live, avatar, offline_background, description, links, tags, app_role
+RETURNING id, name, password, created_at, updated_at, is_banned, is_partner, first_livestream, last_livestream, stream_token, is_live, pfp, offline_background, description, links, tags, app_role, id_category, title
 `
 
 type UserUpdateParams struct {
@@ -152,8 +152,8 @@ type UserUpdateParams struct {
 	IsBanned          pgtype.Bool
 	IsPartnerDoUpdate bool
 	IsPartner         pgtype.Bool
-	AvatarDoUpdate    bool
-	Avatar            pgtype.Text
+	PfpDoUpdate       bool
+	Pfp               pgtype.Text
 	ID                int32
 }
 
@@ -167,8 +167,8 @@ func (q *Queries) UserUpdate(ctx context.Context, arg UserUpdateParams) error {
 		arg.IsBanned,
 		arg.IsPartnerDoUpdate,
 		arg.IsPartner,
-		arg.AvatarDoUpdate,
-		arg.Avatar,
+		arg.PfpDoUpdate,
+		arg.Pfp,
 		arg.ID,
 	)
 	return err

@@ -15,18 +15,11 @@ const livestreamDelete = `-- name: LivestreamDelete :exec
 DELETE FROM
     tc_livestream l
 WHERE
-    l.id_user = (
-        SELECT
-            id
-        FROM
-            tc_user
-        WHERE
-            name = $1
-    )
+    l.id = $1
 `
 
-func (q *Queries) LivestreamDelete(ctx context.Context, name string) error {
-	_, err := q.db.Exec(ctx, livestreamDelete, name)
+func (q *Queries) LivestreamDelete(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, livestreamDelete, id)
 	return err
 }
 
@@ -35,20 +28,24 @@ WITH inserted AS (
     INSERT INTO tc_livestream (
         id_user,
         id_category,
-        is_multistream,
         title
-    ) VALUES (
-        (SELECT id FROM tc_user u WHERE u.name = $1),
-        (SELECT id FROM tc_category c WHERE c.link = $2),
-        FALSE,
-        $3
     )
+    SELECT
+        id,
+        id_category,
+        title
+    FROM tc_user u
+    WHERE
+        u.name = $1
     RETURNING id, id_user, id_category, viewers, title, started_at, is_multistream
 )
 SELECT
     inserted.id AS livestream_id,
-    u.avatar AS user_avatar,
+    u.id AS user_id,
+    u.pfp AS user_pfp,
     u.name AS user_name,
+    u.title AS title,
+    c.id AS category_id,
     c.link AS category_link,
     c.name AS category_name,
     started_at
@@ -64,28 +61,28 @@ ON
     inserted.id_category = c.id
 `
 
-type LivestreamInsertParams struct {
-	Name  string
-	Link  string
-	Title string
-}
-
 type LivestreamInsertRow struct {
 	LivestreamID int32
-	UserAvatar   pgtype.Text
+	UserID       int32
+	UserPfp      pgtype.Text
 	UserName     string
+	Title        pgtype.Text
+	CategoryID   int32
 	CategoryLink string
 	CategoryName string
 	StartedAt    pgtype.Timestamptz
 }
 
-func (q *Queries) LivestreamInsert(ctx context.Context, arg LivestreamInsertParams) (LivestreamInsertRow, error) {
-	row := q.db.QueryRow(ctx, livestreamInsert, arg.Name, arg.Link, arg.Title)
+func (q *Queries) LivestreamInsert(ctx context.Context, name string) (LivestreamInsertRow, error) {
+	row := q.db.QueryRow(ctx, livestreamInsert, name)
 	var i LivestreamInsertRow
 	err := row.Scan(
 		&i.LivestreamID,
-		&i.UserAvatar,
+		&i.UserID,
+		&i.UserPfp,
 		&i.UserName,
+		&i.Title,
+		&i.CategoryID,
 		&i.CategoryLink,
 		&i.CategoryName,
 		&i.StartedAt,
@@ -95,18 +92,18 @@ func (q *Queries) LivestreamInsert(ctx context.Context, arg LivestreamInsertPara
 
 const livestreamUpdate = `-- name: LivestreamUpdate :one
 WITH updated AS (
-    UPDATE tc_livestream
+    UPDATE tc_livestream ls
     SET
-        title = CASE WHEN $1::boolean THEN $2 ELSE title END,
-        id_category = CASE WHEN $3::boolean THEN $4 ELSE id_category END
+        title = CASE WHEN $2::boolean THEN $3 ELSE title END,
+        id_category = CASE WHEN $4::boolean THEN $5 ELSE id_category END
     WHERE
-        id_user = (SELECT id FROM tc_user u WHERE u.name = $5)
+        ls.id = $1
         RETURNING id, id_user, id_category, viewers, title, started_at, is_multistream
     )
 SELECT
     ls.id AS livestream_id,
     updated.title AS title,
-    u.avatar AS user_avatar,
+    u.pfp AS user_pfp,
     u.name AS user_name,
     c.link AS category_link,
     c.name AS category_name
@@ -127,17 +124,17 @@ ON
 `
 
 type LivestreamUpdateParams struct {
-	TitleDoUpdate      pgtype.Bool
+	ID                 int32
+	TitleDoUpdate      bool
 	Title              pgtype.Text
-	IDCategoryDoUpdate pgtype.Bool
+	IDCategoryDoUpdate bool
 	IDCategory         pgtype.Int4
-	Username           pgtype.Text
 }
 
 type LivestreamUpdateRow struct {
 	LivestreamID int32
-	Title        string
-	UserAvatar   pgtype.Text
+	Title        pgtype.Text
+	UserPfp      pgtype.Text
 	UserName     string
 	CategoryLink string
 	CategoryName string
@@ -145,17 +142,17 @@ type LivestreamUpdateRow struct {
 
 func (q *Queries) LivestreamUpdate(ctx context.Context, arg LivestreamUpdateParams) (LivestreamUpdateRow, error) {
 	row := q.db.QueryRow(ctx, livestreamUpdate,
+		arg.ID,
 		arg.TitleDoUpdate,
 		arg.Title,
 		arg.IDCategoryDoUpdate,
 		arg.IDCategory,
-		arg.Username,
 	)
 	var i LivestreamUpdateRow
 	err := row.Scan(
 		&i.LivestreamID,
 		&i.Title,
-		&i.UserAvatar,
+		&i.UserPfp,
 		&i.UserName,
 		&i.CategoryLink,
 		&i.CategoryName,
@@ -166,21 +163,17 @@ func (q *Queries) LivestreamUpdate(ctx context.Context, arg LivestreamUpdatePara
 const livestreamUpdateViewers = `-- name: LivestreamUpdateViewers :exec
 UPDATE tc_livestream
     SET
-        viewers = $1
-    FROM
-        tc_user
+        viewers = $2
     WHERE
-        tc_livestream.id_user = tc_user.id
-    AND
-        tc_user.name = $2
+        id = $1
 `
 
 type LivestreamUpdateViewersParams struct {
+	ID      int32
 	Viewers int32
-	Name    string
 }
 
 func (q *Queries) LivestreamUpdateViewers(ctx context.Context, arg LivestreamUpdateViewersParams) error {
-	_, err := q.db.Exec(ctx, livestreamUpdateViewers, arg.Viewers, arg.Name)
+	_, err := q.db.Exec(ctx, livestreamUpdateViewers, arg.ID, arg.Viewers)
 	return err
 }

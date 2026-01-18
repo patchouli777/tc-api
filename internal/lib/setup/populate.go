@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"main/internal/endpoint/auth"
-	"main/internal/endpoint/category"
-	"main/internal/endpoint/follow"
-	"main/internal/endpoint/user"
+	"main/internal/auth"
+	categoryDomain "main/internal/category/domain"
+	categoryStorage "main/internal/category/storage"
 	"main/internal/external/streamserver"
-	livestreamApi "main/pkg/api/livestream"
+	streamservermock "main/internal/external/streamserver/mock"
+	"main/internal/follow"
+	"main/internal/user"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -20,28 +21,29 @@ func Populate(ctx context.Context,
 	pool *pgxpool.Pool,
 	as *auth.ServiceImpl,
 	ls *streamserver.Adapter,
-	cr *category.RepositoryImpl,
+	cr *categoryStorage.RepositoryImpl,
 	fs *follow.RepositoryImpl,
-	us *user.RepositoryImpl) {
+	us *user.RepositoryImpl,
+	streamServerBaseUrl string) {
 	addTags(ctx, pool)
-	addUsers(ctx, pool)
 	addCategories(ctx, cr)
+	addUsers(ctx, pool)
 	addFollows(ctx, fs)
-	startLivestreams(ctx, cr, ls)
+	startLivestreams(cr, ls, streamServerBaseUrl)
 }
 
-func addCategories(ctx context.Context, cr *category.RepositoryImpl) {
+func addCategories(ctx context.Context, cr *categoryStorage.RepositoryImpl) {
 	slog.Info("adding categories")
 
 	categoriesLen := min(categoriesCount, len(categories))
 	categories = categories[:categoriesLen]
 
 	for _, cat := range categories {
-		err := cr.Create(ctx, category.CategoryCreate{
+		err := cr.Create(ctx, categoryDomain.CategoryCreate{
 			Thumbnail: cat.Thumbnail,
 			Name:      cat.Name,
 			Link:      cat.Link,
-			Tags:      []int32{1, 2},
+			Tags:      []int{1, 2},
 		})
 
 		if err != nil {
@@ -65,16 +67,17 @@ func addUsers(ctx context.Context, pool *pgxpool.Pool) {
 	slog.Info("users added")
 }
 
-func startLivestreams(ctx context.Context, cr *category.RepositoryImpl, ls *streamserver.Adapter) {
+func startLivestreams(cr *categoryStorage.RepositoryImpl, ls *streamserver.Adapter, baseUrl string) {
 	slog.Info("starting livestreams")
 
-	cl := livestreamApi.NewStreamServerClient()
+	cl := streamservermock.NewStreamServerClient(baseUrl)
 
 	for i := range streamsCount {
 		_, err := cl.Start(users[i].Name)
 		if err != nil {
 			log.Fatalf("unable to start livestream: %v", err)
 		}
+
 	}
 
 	slog.Info("livestreams started")
@@ -107,11 +110,11 @@ func addFollows(ctx context.Context, fs *follow.RepositoryImpl) {
 
 func usersToSQL(users []setupUser) string {
 	var sql bytes.Buffer
-	sql.WriteString(`INSERT INTO tc_user(name, password, avatar, description, links, tags) VALUES `)
+	sql.WriteString(`INSERT INTO tc_user(name, password, pfp, description, links, tags, id_category) VALUES `)
 
 	for _, user := range users {
-		sql.WriteString(fmt.Sprintf("('%s', '%s', '%s', '%s', '{instagram, telegram}', '{tag1, tag2}'),",
-			user.Name, user.Password, user.Avatar, user.Description))
+		str := fmt.Sprintf("('%s', '%s', '%s', '%s', '{instagram, telegram}', '{tag1, tag2}', '%d'),", user.Name, user.Password, user.Avatar, user.Description, 3)
+		sql.WriteString(str)
 	}
 	sql.Truncate(sql.Len() - 1)
 	sql.WriteString(";")

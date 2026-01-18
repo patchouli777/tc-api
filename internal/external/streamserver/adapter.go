@@ -3,6 +3,7 @@ package streamserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"main/internal/lib/sl"
@@ -14,17 +15,17 @@ type Adapter struct {
 	endpoint string
 }
 
-func NewAdapter(log *slog.Logger) *Adapter {
+func NewAdapter(log *slog.Logger, endpoint string) *Adapter {
 	return &Adapter{
 		log:      log,
-		endpoint: "http://localhost:1985/api/v1/streams"}
+		endpoint: endpoint + "streams"}
 }
 
-func (u *Adapter) List(ctx context.Context) (*ListResponse, error) {
+func (u *Adapter) List(ctx context.Context, start, count int) (*ListResponse, error) {
 	const op = "livestream.Adapter.List"
 
 	cl := &http.Client{}
-	response, err := cl.Get(u.endpoint)
+	response, err := cl.Get(fmt.Sprintf("%s?start=%d&count=%d", u.endpoint, start, count))
 	if err != nil {
 		u.log.Error("get livestreams", sl.Err(err), sl.Op(op))
 		return nil, err

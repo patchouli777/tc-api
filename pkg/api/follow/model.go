@@ -10,8 +10,8 @@ type ListResponse struct {
 	FollowList []ListResponseItem `json:"follow_list"`
 }
 type ListResponseItem struct {
-	Name   string `json:"name"`
-	Avatar string `json:"avatar"`
+	Name string `json:"name"`
+	Pfp  string `json:"pfp"`
 }
 
 type ListExtendedResponse struct {
@@ -19,8 +19,8 @@ type ListExtendedResponse struct {
 }
 type ListExtendedResponseItem struct {
 	Name     string `json:"name"`
-	Avatar   string `json:"avatar"`
-	Viewers  int32  `json:"viewers"`
+	Pfp      string `json:"pfp"`
+	Viewers  int    `json:"viewers"`
 	Title    string `json:"title"`
 	Category string `json:"category"`
 	IsLive   bool   `json:"is_live"`

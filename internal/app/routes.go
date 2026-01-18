@@ -2,13 +2,15 @@ package app
 
 import (
 	"log/slog"
-	"main/internal/endpoint/auth"
-	"main/internal/endpoint/category"
-	"main/internal/endpoint/channel"
-	"main/internal/endpoint/follow"
-	"main/internal/endpoint/health"
-	"main/internal/endpoint/livestream"
-	"main/internal/endpoint/user"
+	"main/internal/auth"
+	"main/internal/category"
+	categoryStorage "main/internal/category/storage"
+	"main/internal/channel"
+	"main/internal/follow"
+	"main/internal/health"
+	"main/internal/livestream"
+	livestreamStorage "main/internal/livestream/storage"
+	"main/internal/user"
 	"net/http"
 
 	_ "main/docs"
@@ -19,8 +21,8 @@ import (
 func addRoutes(mux *http.ServeMux,
 	log *slog.Logger,
 	authMw authMw,
-	cr *category.RepositoryImpl,
-	lsr *livestream.RepositoryImpl,
+	cr *categoryStorage.RepositoryImpl,
+	lsr *livestreamStorage.RepositoryImpl,
 	chr *channel.RepositoryImpl,
 	as *auth.ServiceImpl,
 	fr *follow.RepositoryImpl,
@@ -30,7 +32,7 @@ func addRoutes(mux *http.ServeMux,
 	livestreamsHandler := livestream.NewHandler(log, lsr)
 	apiMux.HandleFunc("GET /livestreams", livestreamsHandler.List)
 	apiMux.HandleFunc("GET /livestreams/{username}", livestreamsHandler.Get)
-	apiMux.HandleFunc("PATCH /livestreams/{username}", authMw(log, livestreamsHandler.Patch))
+	apiMux.HandleFunc("GET /users/{name}/livestream", livestreamsHandler.GetByUsername)
 
 	// {identifier} is either int id or category link (e.g. "path-of-exile")
 	categoriesHandler := category.NewHandler(log, cr)
@@ -69,6 +71,19 @@ func addRoutes(mux *http.ServeMux,
 
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
+	// mux.HandleFunc("POST /webhooks/livestreams", livestreamsWebhooksHandler)
+
 	fileserver := http.FileServer(http.Dir("./static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fileserver))
 }
+
+// TODO: events
+// func livestreamsWebhooksHandler(w http.ResponseWriter, r *http.Request) {
+// 	var p streamserver.StreamStartedPayload
+// 	err := json.NewDecoder(r.Body).Decode(&p)
+// 	if err != nil {
+// 		fmt.Printf("bad: %+v\n", err)
+// 	}
+
+// 	fmt.Println("good:", p)
+// }

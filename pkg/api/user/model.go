@@ -9,7 +9,7 @@ type GetRequest struct{}
 type GetResponse struct {
 	Id              int       `json:"id"`
 	Name            string    `json:"name"`
-	Avatar          string    `json:"avatar"`
+	Pfp             string    `json:"pfp"`
 	IsBanned        bool      `json:"is_banned"`
 	IsPartner       bool      `json:"is_partner"`
 	IsLive          bool      `json:"is_live"`
@@ -20,14 +20,14 @@ type GetResponse struct {
 type PostRequest struct {
 	Name     string  `json:"name"`
 	Password string  `json:"password"`
-	Avatar   *string `json:"avatar"`
+	Pfp      *string `json:"pfp"`
 }
 type PostResponse struct{}
 
 type PatchRequest struct {
 	Name      null.String `json:"name"`
 	Password  null.String `json:"password"`
-	Avatar    null.String `json:"avatar"`
+	Pfp       null.String `json:"pfp"`
 	IsBanned  null.Bool   `json:"is_banned"`
 	IsPartner null.Bool   `json:"is_partner"`
 }
@@ -56,6 +56,6 @@ type DeleteResponse struct{}
 // 	IsPartner       bool
 // 	FirstLivestream time.Time
 // 	LastLivestream  time.Time
-// 	Avatar          string
+// 	Pfp          string
 // 	Description     string
 // }

@@ -2,7 +2,7 @@ package auth
 
 import (
 	"context"
-	"main/internal/auth"
+	"main/internal/app/auth"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"

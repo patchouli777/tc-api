@@ -3,20 +3,18 @@ package category
 import (
 	"encoding/json"
 	"log/slog"
-	"main/pkg/api/client"
+	baseclient "main/pkg/api/client"
 	"net/http"
 )
 
 type Client struct {
-	base    *client.BaseClient
+	base    *baseclient.Client
 	BaseURL string
 }
 
 func NewClient(log *slog.Logger, url string) *Client {
 	return &Client{
-		base: &client.BaseClient{
-			Client: &http.Client{},
-		},
+		base:    baseclient.NewClient(),
 		BaseURL: url}
 }
 

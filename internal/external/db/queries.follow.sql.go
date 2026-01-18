@@ -93,7 +93,7 @@ func (q *Queries) FollowSelect(ctx context.Context, arg FollowSelectParams) (Fol
 const followSelectMany = `-- name: FollowSelectMany :many
 SELECT
     u1.name,
-    u1.avatar
+    u1.pfp
 FROM
     tc_user_follow f
 INNER JOIN
@@ -109,8 +109,8 @@ WHERE
 `
 
 type FollowSelectManyRow struct {
-	Name   string
-	Avatar pgtype.Text
+	Name string
+	Pfp  pgtype.Text
 }
 
 func (q *Queries) FollowSelectMany(ctx context.Context, name string) ([]FollowSelectManyRow, error) {
@@ -122,7 +122,7 @@ func (q *Queries) FollowSelectMany(ctx context.Context, name string) ([]FollowSe
 	var items []FollowSelectManyRow
 	for rows.Next() {
 		var i FollowSelectManyRow
-		if err := rows.Scan(&i.Name, &i.Avatar); err != nil {
+		if err := rows.Scan(&i.Name, &i.Pfp); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -138,7 +138,7 @@ SELECT
     u.name AS username,
     f.name AS following,
     f.is_live,
-    f.avatar AS avatar,
+    f.pfp AS pfp,
     ls.viewers,
     ls.title,
     c.name AS category
@@ -164,7 +164,7 @@ type FollowSelectManyExtendedRow struct {
 	Username  string
 	Following pgtype.Text
 	IsLive    pgtype.Bool
-	Avatar    pgtype.Text
+	Pfp       pgtype.Text
 	Viewers   pgtype.Int4
 	Title     pgtype.Text
 	Category  pgtype.Text
@@ -183,7 +183,7 @@ func (q *Queries) FollowSelectManyExtended(ctx context.Context, name string) ([]
 			&i.Username,
 			&i.Following,
 			&i.IsLive,
-			&i.Avatar,
+			&i.Pfp,
 			&i.Viewers,
 			&i.Title,
 			&i.Category,

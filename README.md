@@ -8,7 +8,7 @@ Practice.
 
 # Whats here?
 
-* haproxy load balancer
+* asynq task queue
 * swagger docs
 * redis
 * docker
@@ -21,17 +21,10 @@ Practice.
     2. secrets/redis_password.example
     3. .env.example
 
-2. for "production" run*:
-```sh
-make up
-```
-
-3. for local dev run*:
+2. for local dev run:
 ```sh
 make local
-go run ./cmd/server
-```
-\* to populate with data run:
-```
-go run ./cmd/setup
+make ssmock
+make setup
+make server
 ```

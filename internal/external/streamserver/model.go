@@ -54,3 +54,29 @@ type StreamData struct {
 		Profile    string `json:"profile"`
 	} `json:"audio"`
 }
+
+type StreamEventPayload struct {
+	ServerID  string `json:"server_id"`
+	Action    string `json:"action"` // e.g. "on_publish", "on_unpublish"
+	ClientID  string `json:"client_id"`
+	IP        string `json:"ip"`
+	Vhost     string `json:"vhost"`
+	App       string `json:"app"`
+	TcURL     string `json:"tcUrl"`
+	Stream    string `json:"stream"` // channel
+	Param     string `json:"param"`
+	StreamURL string `json:"stream_url"`
+	StreamID  string `json:"stream_id"`
+}
+
+type SubscribeRequest struct {
+	CallbackURL string
+}
+
+type SubscribeResponse struct {
+	Success bool
+}
+
+type UnsubscribeRequest struct {
+	CallbackURL string
+}

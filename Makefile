@@ -1,4 +1,4 @@
-﻿.PHONY: up re fake local local-stop demo demo-stop swag test lint
+﻿.PHONY: up re fake local local-stop demo demo-stop swag test lint ssmock setup server streaming
 
 
 swag:
@@ -65,7 +65,7 @@ demo:
 	-p 8080:8080 \
 	-p 8000:8000/udp \
 	-p 10080:10080/udp \
-	--rm ossrs/srs
+	--rm ossrs/srs:latest
 
 
 demo-stop:
@@ -80,3 +80,29 @@ test:
 
 lint:
 	golangci-lint run
+
+
+ssmock:
+	go run ./cmd/streamservermock
+
+
+setup:
+	go run ./cmd/setup
+
+
+server:
+	go run ./cmd/server
+
+
+streaming:
+	docker run -d \
+	--name twc-streaming-server \
+	-it \
+	-p 1935:1935 \
+	-p 1985:1985 \
+	-p 8080:8080 \
+	-p 8085:8081 \
+	-p 8000:8000/udp \
+	-p 10080:10080/udp \
+	--rm \
+	ossrs/srs:latest

@@ -20,7 +20,9 @@ type Config struct {
 	GRPC               GrpcClientConfig
 	Redis              RedisConfig
 	Logger             LoggerConfig
+	Asynq              AsynqConfig
 	Update             UpdateConfig
+	StreamServer       StreamServerConfig
 	Env                string `env:"ENV" env-default:"prod"`
 	InstanceID         uuid.UUID
 	AuthServiceMock    bool `env:"AUTH_SERVICE_MOCK" env-default:"false"`
@@ -39,12 +41,24 @@ func GetConfig() Config {
 	return cfg
 }
 
+type AsynqConfig struct {
+	RedisHost          string `env:"REDIS_HOST" env-default:"0.0.0.0"`
+	RedisPort          string `env:"REDIS_PORT" env-default:"6379"`
+	MaxConcurrentTasks int    `env:"MAX_CONCURRENT_TASKS" env-default:"10"`
+}
+
 type HttpServerConfig struct {
 	Host         string        `env:"HTTP_HOST" env-default:"0.0.0.0"`
 	Port         string        `env:"HTTP_PORT" env-default:"8090"`
 	ReadTimeout  time.Duration `env:"HTTP_READ_TIMEOUT" env-default:"30s"`
 	WriteTimeout time.Duration `env:"HTTP_WRITE_TIMEOUT" env-default:"30s"`
 	IdleTimeout  time.Duration `env:"HTTP_IDLE_TIMEOUT" env-default:"30s"`
+}
+
+type StreamServerConfig struct {
+	Host     string `env:"STREAM_SERVER_HOST" env-default:"127.0.0.1"`
+	Port     string `env:"STREAM_SERVER_PORT" env-default:"1985"`
+	Endpoint string `env:"STREAM_SERVER_API_ENDPOINT" env-default:"/api/v1"`
 }
 
 type UpdateConfig struct {

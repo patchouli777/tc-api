@@ -4,17 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	appAuth "main/internal/auth"
-	"main/internal/endpoint/auth"
-	"main/internal/endpoint/category"
-	"main/internal/endpoint/channel"
-	"main/internal/endpoint/follow"
-	"main/internal/endpoint/livestream"
-	"main/internal/endpoint/user"
+	appAuth "main/internal/app/auth"
+	"main/internal/auth"
+	"main/internal/category"
+	categoryStorage "main/internal/category/storage"
+	"main/internal/channel"
 	authExternal "main/internal/external/auth"
 	"main/internal/external/streamserver"
+	"main/internal/follow"
 	"main/internal/lib/mw"
 	"main/internal/lib/sl"
+	"main/internal/livestream"
+	livestreamStorage "main/internal/livestream/storage"
+	"main/internal/user"
 	"net/http"
 	"os"
 
@@ -25,12 +27,13 @@ import (
 )
 
 func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
+	redisAddr := fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port)
 	rdb := redis.NewClient(&redis.Options{
 		// https://github.com/redis/go-redis/issues/3536
 		MaintNotificationsConfig: &maintnotifications.Config{
 			Mode: maintnotifications.ModeDisabled,
 		},
-		Addr:     fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
+		Addr:     redisAddr,
 		Password: cfg.Redis.Password,
 		DB:       0,
 	})
@@ -54,45 +57,20 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 		return nil
 	}
 
-	app := InitApp(ctx,
+	app := NewApp(ctx,
 		log,
-		cfg.InstanceID.String(),
-		cfg.Env,
-		authClient,
 		rdb,
-		pool)
+		pool,
+		authClient,
+		cfg.Env,
+		cfg.InstanceID.String(),
+		cfg.StreamServer,
+		cfg.Asynq)
+
+	InitApp(ctx, log, rdb, cfg.InstanceID.String(), app, cfg.Update, cfg.StreamServer)
 
 	authMw := NewAuthMiddleware(log, cfg.AuthMiddlewareMock)
 	handler := CreateHandler(ctx, log, authMw, app)
-
-	taskqserv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: fmt.Sprintf("%s:%s", "0.0.0.0", "6379")},
-		asynq.Config{Concurrency: 10},
-	)
-
-	sched := asynq.NewScheduler(asynq.RedisClientOpt{
-		Addr: fmt.Sprintf("%s:%s", "0.0.0.0", "6379")}, nil)
-
-	asyncqMux := asynq.NewServeMux()
-	updSched := livestream.NewUpdateScheduler(log, app.StreamServerAdapter, app.Livestream, sched)
-	asyncqMux.HandleFunc(livestream.TypeLivestreamUpdate, updSched.HandleUpdateTask)
-
-	go func() {
-		if err := taskqserv.Run(asyncqMux); err != nil {
-			log.Error("asynq server down")
-		}
-	}()
-
-	go func() {
-		if err := sched.Run(); err != nil {
-			log.Error("scheduler down", sl.Err(err))
-			return
-		}
-	}()
-
-	app.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
-	go updSched.Update(ctx, cfg.Update.LivestreamsTimeout)
-
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", cfg.HTTP.Host, cfg.HTTP.Port),
 		Handler:      handler,
@@ -103,17 +81,60 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 	return server
 }
 
+// spins up workers, subscribes to stream server event and stuff
+func InitApp(ctx context.Context, log *slog.Logger, r *redis.Client, instanceID string, app *App, updCfg UpdateConfig, ssCfg StreamServerConfig) {
+	asyncqMux := asynq.NewServeMux()
+	updSched := livestream.NewUpdateScheduler(log, r, app.StreamServerAdapter, app.LivestreamRepo, app.TaskScheduler, instanceID)
+	asyncqMux.HandleFunc(livestream.TypeLivestreamUpdate, updSched.HandleUpdateTask)
+
+	go func() {
+		if err := app.TaskQServer.Run(asyncqMux); err != nil {
+			log.Error("asynq server down", sl.Err(err))
+		}
+	}()
+
+	go func() {
+		if err := app.TaskScheduler.Run(); err != nil {
+			log.Error("scheduler down", sl.Err(err))
+		}
+	}()
+
+	app.CategoryUpdater.Update(ctx, updCfg.CategoriesTimeout)
+	go updSched.Run(ctx, updCfg.LivestreamsTimeout)
+
+	// TODO: events
+	// cl := baseclient.NewClient()
+	// ssURL := fmt.Sprintf("http://%s:%s%s/", ssCfg.Host, ssCfg.Port, ssCfg.Endpoint)
+	// req, err := cl.Post(ssURL+"/subscribe",
+	// 	streamserver.SubscribeRequest{CallbackURL: "/webhooks/livestreams"})
+	// if err != nil {
+	// 	log.Error("big error 1", sl.Err(err))
+	// }
+
+	// resp, err := cl.Client.Do(req)
+	// if err != nil {
+	// 	log.Error("big error 2", sl.Err(err))
+	// }
+
+	// var subr streamserver.SubscribeResponse
+	// err = json.NewDecoder(resp.Body).Decode(&subr)
+	// if err != nil {
+	// 	log.Error("big error 3", sl.Err(err))
+	// }
+	// fmt.Println(subr)
+}
+
 func CreateHandler(ctx context.Context, log *slog.Logger, authMw authMw, app *App) http.Handler {
 	mux := http.NewServeMux()
 
 	addRoutes(mux, log,
 		authMw,
-		app.Category,
-		app.Livestream,
-		app.Channel,
-		app.Auth,
-		app.Follow,
-		app.User)
+		app.CategoryRepo,
+		app.LivestreamRepo,
+		app.ChannelRepo,
+		app.AuthService,
+		app.FollowRepo,
+		app.UserRepo)
 
 	panicRecovery := mw.PanicRecovery(log)
 	logging := mw.Logging(log)
@@ -121,29 +142,35 @@ func CreateHandler(ctx context.Context, log *slog.Logger, authMw authMw, app *Ap
 }
 
 type App struct {
-	Auth                *auth.ServiceImpl
-	Livestream          *livestream.RepositoryImpl
-	Category            *category.RepositoryImpl
+	AuthService         *auth.ServiceImpl
+	LivestreamRepo      *livestreamStorage.RepositoryImpl
+	CategoryRepo        *categoryStorage.RepositoryImpl
 	StreamServerAdapter *streamserver.Adapter
 	CategoryUpdater     *category.CategoryUpdater
-	Follow              *follow.RepositoryImpl
-	User                *user.RepositoryImpl
-	Channel             *channel.RepositoryImpl
+	FollowRepo          *follow.RepositoryImpl
+	UserRepo            *user.RepositoryImpl
+	ChannelRepo         *channel.RepositoryImpl
+	TaskQServer         *asynq.Server
+	TaskScheduler       *asynq.Scheduler
 }
 
-func InitApp(ctx context.Context,
+// initialize pgx, redis and auth client outside because of tests
+func NewApp(ctx context.Context,
 	log *slog.Logger,
-	instanceID string,
-	env string,
-	client auth.Client,
 	rdb *redis.Client,
-	pool *pgxpool.Pool) *App {
-	livestreamRepo := livestream.NewRepo(rdb, pool)
+	pool *pgxpool.Pool,
+	// TODO: why client here?
+	client auth.Client,
+	env string,
+	instanceID string,
+	ssCfg StreamServerConfig,
+	asynqCfg AsynqConfig) *App {
+	livestreamRepo := livestreamStorage.NewRepo(rdb, pool)
 
 	channelDBAdapter := channel.NewAdapter(pool)
 	channelRepo := channel.NewRepository(log, channelDBAdapter)
 
-	categoryRepo := category.NewRepo(rdb, pool)
+	categoryRepo := categoryStorage.NewRepo(rdb, pool)
 	categoryUpdater := category.NewUpdater(log, livestreamRepo, categoryRepo)
 
 	authDBAdapter := auth.NewAdapter(pool)
@@ -153,17 +180,25 @@ func InitApp(ctx context.Context,
 
 	userRepo := user.NewRepository(pool)
 
-	streamServerAdapter := streamserver.NewAdapter(log)
+	ssURL := fmt.Sprintf("http://%s:%s%s/", ssCfg.Host, ssCfg.Port, ssCfg.Endpoint)
+	streamServerAdapter := streamserver.NewAdapter(log, ssURL)
+
+	asyncRedis := fmt.Sprintf("%s:%s", asynqCfg.RedisHost, asynqCfg.RedisPort)
+	taskqserv := asynq.NewServer(asynq.RedisClientOpt{Addr: asyncRedis},
+		asynq.Config{Concurrency: asynqCfg.MaxConcurrentTasks})
+	sched := asynq.NewScheduler(asynq.RedisClientOpt{Addr: asyncRedis}, nil)
 
 	return &App{
-		Auth:                authService,
-		Livestream:          livestreamRepo,
-		Channel:             channelRepo,
-		Category:            categoryRepo,
+		AuthService:         authService,
+		LivestreamRepo:      livestreamRepo,
+		ChannelRepo:         channelRepo,
+		CategoryRepo:        categoryRepo,
 		CategoryUpdater:     categoryUpdater,
-		Follow:              followRepo,
-		User:                userRepo,
-		StreamServerAdapter: streamServerAdapter}
+		FollowRepo:          followRepo,
+		UserRepo:            userRepo,
+		StreamServerAdapter: streamServerAdapter,
+		TaskQServer:         taskqserv,
+		TaskScheduler:       sched}
 }
 
 type authMw = func(log *slog.Logger, next http.HandlerFunc) http.HandlerFunc
@@ -195,7 +230,7 @@ func NewAuthClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConf
 			cfg.Retries)
 	}
 
-	log.Info("ENV is not prod and AUTH_SERVICE_MOCK is not false. Initializing mock grpc auth client.")
+	log.Info("ENV is not prod and AUTH_SERVICE_MOCK == true. Initializing mock grpc auth client.")
 	return &authExternal.ClientMock{}, nil
 }
 
