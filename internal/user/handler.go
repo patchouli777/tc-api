@@ -7,17 +7,18 @@ import (
 	"log/slog"
 	"main/internal/app/auth"
 	"main/internal/lib/handler"
+	d "main/internal/user/domain"
 	api "main/pkg/api/user"
 	"net/http"
 	"strconv"
 )
 
 type Repository interface {
-	Get(ctx context.Context, id int32) (*User, error)
-	Create(ctx context.Context, u UserCreate) error
-	Update(ctx context.Context, id int32, upd UserUpdate) error
+	Get(ctx context.Context, id int32) (*d.User, error)
+	Create(ctx context.Context, u d.UserCreate) error
+	Update(ctx context.Context, id int32, upd d.UserUpdate) error
 	Delete(ctx context.Context, id int32) error
-	List(ctx context.Context, l UserList) ([]User, error)
+	List(ctx context.Context, l d.UserList) ([]d.User, error)
 }
 
 type Handler struct {
@@ -52,7 +53,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.s.Get(r.Context(), int32(idInt))
 	if err != nil {
-		if errors.Is(err, errNotFound) {
+		if errors.Is(err, d.ErrNotFound) {
 			handler.Error(h.log, w, op, err, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -95,27 +96,27 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Name == "" {
-		handler.Error(h.log, w, op, errUsernameRequired, http.StatusBadRequest, errUsernameRequired.Error())
+		handler.Error(h.log, w, op, d.ErrUsernameRequired, http.StatusBadRequest, d.ErrUsernameRequired.Error())
 		return
 	}
 
 	if req.Password == "" {
-		handler.Error(h.log, w, op, errPasswordRequired, http.StatusBadRequest, errPasswordRequired.Error())
+		handler.Error(h.log, w, op, d.ErrPasswordRequired, http.StatusBadRequest, d.ErrPasswordRequired.Error())
 		return
 	}
 
-	if err := h.s.Create(r.Context(), UserCreate{
+	if err := h.s.Create(r.Context(), d.UserCreate{
 		Name:     req.Name,
 		Password: req.Password,
 		Pfp:      *req.Pfp,
 	}); err != nil {
-		if errors.Is(err, errAlreadyExists) {
-			handler.Error(h.log, w, op, err, http.StatusConflict, errAlreadyExists.Error())
+		if errors.Is(err, d.ErrAlreadyExists) {
+			handler.Error(h.log, w, op, err, http.StatusConflict, d.ErrAlreadyExists.Error())
 			return
 		}
 
-		if errors.Is(err, errWeakPassword) {
-			handler.Error(h.log, w, op, err, http.StatusBadRequest, errWeakPassword.Error())
+		if errors.Is(err, d.ErrWeakPassword) {
+			handler.Error(h.log, w, op, err, http.StatusBadRequest, d.ErrWeakPassword.Error())
 			return
 		}
 
@@ -170,20 +171,20 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.s.Update(ctx, int32(idInt), UserUpdate{
+	if err := h.s.Update(ctx, int32(idInt), d.UserUpdate{
 		Name:      req.Name,
 		Password:  req.Password,
 		Pfp:       req.Pfp,
 		IsBanned:  req.IsBanned,
 		IsPartner: req.IsPartner,
 	}); err != nil {
-		if errors.Is(err, errAlreadyExists) {
-			handler.Error(h.log, w, op, err, http.StatusConflict, errAlreadyExists.Error())
+		if errors.Is(err, d.ErrAlreadyExists) {
+			handler.Error(h.log, w, op, err, http.StatusConflict, d.ErrAlreadyExists.Error())
 			return
 		}
 
-		if errors.Is(err, errWeakPassword) {
-			handler.Error(h.log, w, op, err, http.StatusBadRequest, errWeakPassword.Error())
+		if errors.Is(err, d.ErrWeakPassword) {
+			handler.Error(h.log, w, op, err, http.StatusBadRequest, d.ErrWeakPassword.Error())
 			return
 		}
 

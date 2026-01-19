@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	d "main/internal/auth/domain"
 	"main/internal/lib/handler"
 	"main/internal/lib/sl"
 	api "main/pkg/api/auth"
@@ -13,8 +14,8 @@ import (
 )
 
 type Service interface {
-	SignIn(ctx context.Context, username, password string) (*TokenPair, error)
-	SignUp(ctx context.Context, email, username, password string) (*TokenPair, error)
+	SignIn(ctx context.Context, username, password string) (*d.TokenPair, error)
+	SignUp(ctx context.Context, email, username, password string) (*d.TokenPair, error)
 }
 
 type Handler struct {
@@ -52,8 +53,8 @@ func (h Handler) SignIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error(op, sl.Err(err))
 
-		if errors.Is(err, errWrongCredentials) {
-			handler.Error(h.log, w, op, err, http.StatusBadRequest, errWrongCredentials.Error())
+		if errors.Is(err, d.ErrWrongCredentials) {
+			handler.Error(h.log, w, op, err, http.StatusBadRequest, d.ErrWrongCredentials.Error())
 			return
 		}
 
@@ -97,8 +98,8 @@ func (h Handler) SignUp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error(op, sl.Err(err))
 
-		if errors.Is(err, errAlreadyExists) {
-			handler.Error(h.log, w, op, err, http.StatusConflict, errAlreadyExists.Error())
+		if errors.Is(err, d.ErrAlreadyExists) {
+			handler.Error(h.log, w, op, err, http.StatusConflict, d.ErrAlreadyExists.Error())
 			return
 		}
 

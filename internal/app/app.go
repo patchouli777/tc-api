@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"log/slog"
 	appAuth "main/internal/app/auth"
-	"main/internal/auth"
-	"main/internal/category"
+	authStorage "main/internal/auth/storage"
+	categoryService "main/internal/category/service"
 	categoryStorage "main/internal/category/storage"
-	"main/internal/channel"
+	channelStorage "main/internal/channel/storage"
 	authExternal "main/internal/external/auth"
 	"main/internal/external/streamserver"
-	"main/internal/follow"
+	followStorage "main/internal/follow/storage"
 	"main/internal/lib/mw"
 	"main/internal/lib/sl"
-	"main/internal/livestream"
+	livestreamService "main/internal/livestream/service"
 	livestreamStorage "main/internal/livestream/storage"
-	"main/internal/user"
+	userStorage "main/internal/user/storage"
 	"net/http"
 	"os"
 
@@ -84,8 +84,8 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 // spins up workers, subscribes to stream server event and stuff
 func InitApp(ctx context.Context, log *slog.Logger, r *redis.Client, instanceID string, app *App, updCfg UpdateConfig, ssCfg StreamServerConfig) {
 	asyncqMux := asynq.NewServeMux()
-	updSched := livestream.NewUpdateScheduler(log, r, app.StreamServerAdapter, app.LivestreamRepo, app.TaskScheduler, instanceID)
-	asyncqMux.HandleFunc(livestream.TypeLivestreamUpdate, updSched.HandleUpdateTask)
+	updSched := livestreamService.NewUpdateScheduler(log, r, app.StreamServerAdapter, app.LivestreamRepo, app.TaskScheduler, instanceID)
+	asyncqMux.HandleFunc(livestreamService.TypeLivestreamUpdate, updSched.HandleUpdateTask)
 
 	go func() {
 		if err := app.TaskQServer.Run(asyncqMux); err != nil {
@@ -142,14 +142,14 @@ func CreateHandler(ctx context.Context, log *slog.Logger, authMw authMw, app *Ap
 }
 
 type App struct {
-	AuthService         *auth.ServiceImpl
+	AuthService         *authStorage.ServiceImpl
 	LivestreamRepo      *livestreamStorage.RepositoryImpl
 	CategoryRepo        *categoryStorage.RepositoryImpl
 	StreamServerAdapter *streamserver.Adapter
-	CategoryUpdater     *category.CategoryUpdater
-	FollowRepo          *follow.RepositoryImpl
-	UserRepo            *user.RepositoryImpl
-	ChannelRepo         *channel.RepositoryImpl
+	CategoryUpdater     *categoryService.CategoryUpdater
+	FollowRepo          *followStorage.RepositoryImpl
+	UserRepo            *userStorage.RepositoryImpl
+	ChannelRepo         *channelStorage.RepositoryImpl
 	TaskQServer         *asynq.Server
 	TaskScheduler       *asynq.Scheduler
 }
@@ -159,26 +159,23 @@ func NewApp(ctx context.Context,
 	log *slog.Logger,
 	rdb *redis.Client,
 	pool *pgxpool.Pool,
-	// TODO: why client here?
-	client auth.Client,
+	client authStorage.Client,
 	env string,
 	instanceID string,
 	ssCfg StreamServerConfig,
 	asynqCfg AsynqConfig) *App {
 	livestreamRepo := livestreamStorage.NewRepo(rdb, pool)
 
-	channelDBAdapter := channel.NewAdapter(pool)
-	channelRepo := channel.NewRepository(log, channelDBAdapter)
+	channelRepo := channelStorage.NewRepository(pool)
 
 	categoryRepo := categoryStorage.NewRepo(rdb, pool)
-	categoryUpdater := category.NewUpdater(log, livestreamRepo, categoryRepo)
+	categoryUpdater := categoryService.NewUpdater(log, livestreamRepo, categoryRepo)
 
-	authDBAdapter := auth.NewAdapter(pool)
-	authService := auth.NewService(client, authDBAdapter)
+	authService := authStorage.NewService(client, pool)
 
-	followRepo := follow.NewRepository(pool)
+	followRepo := followStorage.NewRepository(pool)
 
-	userRepo := user.NewRepository(pool)
+	userRepo := userStorage.NewRepository(pool)
 
 	ssURL := fmt.Sprintf("http://%s:%s%s/", ssCfg.Host, ssCfg.Port, ssCfg.Endpoint)
 	streamServerAdapter := streamserver.NewAdapter(log, ssURL)
@@ -212,7 +209,7 @@ func NewAuthMiddleware(log *slog.Logger, isMock bool) authMw {
 	}
 }
 
-func NewAuthClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfig) (auth.Client, error) {
+func NewAuthClient(log *slog.Logger, env string, isMock bool, cfg GrpcClientConfig) (authStorage.Client, error) {
 	if env == envProd {
 		return authExternal.NewClient(log,
 			cfg.Host,

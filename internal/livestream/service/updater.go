@@ -18,15 +18,17 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type CreaterUpdater interface {
-	Creater
-	Updater
+type Store interface {
+	Create(ctx context.Context, cr d.LivestreamCreate) (*d.Livestream, error)
+	Update(ctx context.Context, id int, upd d.LivestreamUpdate) (*d.Livestream, error)
+	UpdateViewers(ctx context.Context, id int, viewers int) error
+	UpdateThumbnail(ctx context.Context, id int, thumbnail string) error
 }
 
 type UpdateScheduler struct {
 	log   *slog.Logger
 	ssa   *streamserver.Adapter
-	lsr   CreaterUpdater
+	lsr   Store
 	sched *asynq.Scheduler
 
 	previews   []os.DirEntry
@@ -70,13 +72,12 @@ func (s *UpdateScheduler) Run(ctx context.Context, timeout time.Duration) {
 				if err != nil {
 					s.log.Error("poll srs", sl.Err(err))
 				}
+				s.log.Info(fmt.Sprintf("Livestreams updated. Next in %v", timeout))
 			}()
 		}
 	}
 }
 
-// At startup, each Go instance registers its instance ID in Redis (set go_poller:<instance_id> with TTL 60s, heartbeat every 30s).
-// Discover other instances via SCAN on go_poller:* keys to coordinate SRS assignments.
 func (s *UpdateScheduler) Register(ctx context.Context) error {
 	return s.rdb.Set(ctx, s.pollerKey(), time.Now().Unix(), 60*time.Second).Err()
 }
@@ -110,9 +111,9 @@ func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
 			ls, err := s.lsr.Create(ctx, d.LivestreamCreate{Username: st.Name})
 			if err != nil {
 				if errors.Is(err, d.ErrAlreadyStarted) {
-					s.log.Debug("livestream already started",
-						slog.String("username", st.Name),
-						slog.String("livestream_id", st.ID))
+					// s.log.Debug("livestream already started",
+					// 	slog.String("username", st.Name),
+					// 	slog.String("livestream_id", st.ID))
 					continue
 				}
 				s.log.Error("creating livestream",
@@ -124,7 +125,7 @@ func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
 
 			payload, err := json.Marshal(livestreamTaskPayload{LivestreamID: ls.Id, Username: ls.UserName})
 			if err != nil {
-				s.log.Error("error creating payoload", sl.Err(err))
+				s.log.Error("error creating payload", sl.Err(err))
 				return err
 			}
 
@@ -142,7 +143,7 @@ func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
 func NewUpdateScheduler(log *slog.Logger,
 	rdb *redis.Client,
 	ssa *streamserver.Adapter,
-	lsr CreaterUpdater,
+	lsr Store,
 	sched *asynq.Scheduler,
 	instanceID string) *UpdateScheduler {
 	entries, err := os.ReadDir("./static/livestreamthumbs")
@@ -180,9 +181,9 @@ func (s *UpdateScheduler) HandleUpdateTask(ctx context.Context, t *asynq.Task) e
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return err
 	}
-	// s.log.Info("big handling of update task",
-	// 	slog.String("user", p.Username),
-	// 	slog.Int("id", p.LivestreamID))
+	s.log.Info("Handling update task",
+		slog.String("user", p.Username),
+		slog.Int("id", p.LivestreamID))
 
 	resp, err := s.ssa.Get(ctx, p.Username)
 	if err != nil {

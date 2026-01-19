@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"main/internal/external/db"
+	d "main/internal/user/domain"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,7 +18,7 @@ func NewRepository(pool *pgxpool.Pool) *RepositoryImpl {
 	return &RepositoryImpl{pool: pool}
 }
 
-func (r *RepositoryImpl) Get(ctx context.Context, id int32) (*User, error) {
+func (r *RepositoryImpl) Get(ctx context.Context, id int32) (*d.User, error) {
 	q := queriesAdapter{queries: db.New(r.pool)}
 
 	res, err := q.Select(ctx, id)
@@ -25,7 +26,7 @@ func (r *RepositoryImpl) Get(ctx context.Context, id int32) (*User, error) {
 		return nil, err
 	}
 
-	return &User{
+	return &d.User{
 		Id:              res.ID,
 		Name:            res.Name,
 		IsBanned:        res.IsBanned.Bool,
@@ -35,7 +36,7 @@ func (r *RepositoryImpl) Get(ctx context.Context, id int32) (*User, error) {
 		Pfp:             res.Pfp.String}, nil
 }
 
-func (r *RepositoryImpl) Create(ctx context.Context, u UserCreate) error {
+func (r *RepositoryImpl) Create(ctx context.Context, u d.UserCreate) error {
 	q := queriesAdapter{queries: db.New(r.pool)}
 
 	err := q.Insert(ctx, db.UserInsertParams{Name: u.Name,
@@ -45,7 +46,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, u UserCreate) error {
 	return err
 }
 
-func (r *RepositoryImpl) Update(ctx context.Context, id int32, upd UserUpdate) error {
+func (r *RepositoryImpl) Update(ctx context.Context, id int32, upd d.UserUpdate) error {
 	q := queriesAdapter{queries: db.New(r.pool)}
 
 	err := q.Update(ctx, db.UserUpdateParams{
@@ -80,6 +81,6 @@ func (r *RepositoryImpl) Delete(ctx context.Context, id int32) error {
 	return q.Delete(ctx, id)
 }
 
-func (r *RepositoryImpl) List(ctx context.Context, ul UserList) ([]User, error) {
+func (r *RepositoryImpl) List(ctx context.Context, ul d.UserList) ([]d.User, error) {
 	return nil, errors.New("not implemented")
 }

@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	d "main/internal/channel/domain"
 	"main/internal/lib/handler"
 	api "main/pkg/api/channel"
 	"net/http"
 )
 
 type Repository interface {
-	Get(ctx context.Context, username string) (*Channel, error)
-	Update(ctx context.Context, upd ChannelUpdate) error
+	Get(ctx context.Context, username string) (*d.Channel, error)
+	Update(ctx context.Context, upd d.ChannelUpdate) error
 }
 
 type Handler struct {
@@ -41,7 +42,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	channel := r.PathValue("channel")
 
 	if channel == "" {
-		handler.Error(h.log, w, op, errNotPresent, http.StatusBadRequest, errNotPresent.Error())
+		handler.Error(h.log, w, op, d.ErrNotPresent, http.StatusBadRequest, d.ErrNotPresent.Error())
 		return
 	}
 
@@ -66,7 +67,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	const op = "updating channel"
 
-	var channelUpdate ChannelUpdate
+	var channelUpdate d.ChannelUpdate
 	if err := json.NewDecoder(r.Body).Decode(&channelUpdate); err != nil {
 		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgRequest)
 		return

@@ -3,14 +3,18 @@ package app
 import (
 	"log/slog"
 	"main/internal/auth"
+	authStorage "main/internal/auth/storage"
 	"main/internal/category"
 	categoryStorage "main/internal/category/storage"
 	"main/internal/channel"
+	channelStorage "main/internal/channel/storage"
 	"main/internal/follow"
+	followStorage "main/internal/follow/storage"
 	"main/internal/health"
 	"main/internal/livestream"
 	livestreamStorage "main/internal/livestream/storage"
 	"main/internal/user"
+	userStorage "main/internal/user/storage"
 	"net/http"
 
 	_ "main/docs"
@@ -23,10 +27,10 @@ func addRoutes(mux *http.ServeMux,
 	authMw authMw,
 	cr *categoryStorage.RepositoryImpl,
 	lsr *livestreamStorage.RepositoryImpl,
-	chr *channel.RepositoryImpl,
-	as *auth.ServiceImpl,
-	fr *follow.RepositoryImpl,
-	ur *user.RepositoryImpl) {
+	chr *channelStorage.RepositoryImpl,
+	as *authStorage.ServiceImpl,
+	fr *followStorage.RepositoryImpl,
+	ur *userStorage.RepositoryImpl) {
 	apiMux := http.NewServeMux()
 
 	livestreamsHandler := livestream.NewHandler(log, lsr)

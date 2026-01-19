@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"main/internal/external/db"
+	d "main/internal/follow/domain"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,7 +19,7 @@ func NewRepository(pool *pgxpool.Pool) *RepositoryImpl {
 }
 
 func (r *RepositoryImpl) IsFollower(ctx context.Context, follower, followed string) (bool, error) {
-	q := QueriesAdapter{queries: db.New(r.pool)}
+	q := queriesAdapter{queries: db.New(r.pool)}
 
 	_, err := q.Select(ctx, db.FollowSelectParams{
 		Name:   follower,
@@ -31,17 +32,17 @@ func (r *RepositoryImpl) IsFollower(ctx context.Context, follower, followed stri
 	return true, nil
 }
 
-func (r *RepositoryImpl) List(ctx context.Context, follower string) ([]FollowerListItem, error) {
-	q := QueriesAdapter{queries: db.New(r.pool)}
+func (r *RepositoryImpl) List(ctx context.Context, follower string) ([]d.FollowerListItem, error) {
+	q := queriesAdapter{queries: db.New(r.pool)}
 
 	list, err := q.SelectMany(ctx, follower)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get following list: %w", err)
 	}
 
-	following := make([]FollowerListItem, len(list))
+	following := make([]d.FollowerListItem, len(list))
 	for i, f := range list {
-		following[i] = FollowerListItem{
+		following[i] = d.FollowerListItem{
 			Name: f.Name,
 			Pfp:  f.Pfp.String,
 		}
@@ -50,17 +51,17 @@ func (r *RepositoryImpl) List(ctx context.Context, follower string) ([]FollowerL
 	return following, nil
 }
 
-func (r *RepositoryImpl) ListExtended(ctx context.Context, follower string) ([]FollowingListExtendedItem, error) {
-	q := QueriesAdapter{queries: db.New(r.pool)}
+func (r *RepositoryImpl) ListExtended(ctx context.Context, follower string) ([]d.FollowingListExtendedItem, error) {
+	q := queriesAdapter{queries: db.New(r.pool)}
 
 	list, err := q.SelectManyExtended(ctx, follower)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get extended following list: %w", err)
 	}
 
-	following := make([]FollowingListExtendedItem, len(list))
+	following := make([]d.FollowingListExtendedItem, len(list))
 	for i, f := range list {
-		following[i] = FollowingListExtendedItem{
+		following[i] = d.FollowingListExtendedItem{
 			Name:     f.Following.String,
 			Pfp:      f.Pfp.String,
 			Viewers:  int(f.Viewers.Int32),
@@ -74,7 +75,7 @@ func (r *RepositoryImpl) ListExtended(ctx context.Context, follower string) ([]F
 }
 
 func (r *RepositoryImpl) Follow(ctx context.Context, follower, followed string) error {
-	q := QueriesAdapter{queries: db.New(r.pool)}
+	q := queriesAdapter{queries: db.New(r.pool)}
 
 	err := q.Insert(ctx, db.FollowInsertParams{
 		Column1: pgtype.Text{String: follower, Valid: true},
@@ -88,7 +89,7 @@ func (r *RepositoryImpl) Follow(ctx context.Context, follower, followed string) 
 }
 
 func (r *RepositoryImpl) Unfollow(ctx context.Context, unfollower, unfollowed string) error {
-	q := QueriesAdapter{queries: db.New(r.pool)}
+	q := queriesAdapter{queries: db.New(r.pool)}
 
 	err := q.Delete(ctx, db.FollowDeleteParams{
 		Name:   unfollower,

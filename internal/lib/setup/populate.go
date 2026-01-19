@@ -6,24 +6,25 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"main/internal/auth"
+	authStorage "main/internal/auth/storage"
 	categoryDomain "main/internal/category/domain"
 	categoryStorage "main/internal/category/storage"
 	"main/internal/external/streamserver"
 	streamservermock "main/internal/external/streamserver/mock"
-	"main/internal/follow"
-	"main/internal/user"
+	follow "main/internal/follow/storage"
+	followStorage "main/internal/follow/storage"
+	userStorage "main/internal/user/storage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func Populate(ctx context.Context,
 	pool *pgxpool.Pool,
-	as *auth.ServiceImpl,
+	as *authStorage.ServiceImpl,
 	ls *streamserver.Adapter,
 	cr *categoryStorage.RepositoryImpl,
-	fs *follow.RepositoryImpl,
-	us *user.RepositoryImpl,
+	fs *followStorage.RepositoryImpl,
+	us *userStorage.RepositoryImpl,
 	streamServerBaseUrl string) {
 	addTags(ctx, pool)
 	addCategories(ctx, cr)

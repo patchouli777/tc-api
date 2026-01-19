@@ -1,27 +1,32 @@
-package channel
+package storage
 
 import (
 	"context"
 	"errors"
-	"log/slog"
+
+	d "main/internal/channel/domain"
+	"main/internal/external/db"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RepositoryImpl struct {
-	log     *slog.Logger
-	queries *QueriesAdapter
+	pool *pgxpool.Pool
 }
 
-func NewRepository(log *slog.Logger, q *QueriesAdapter) *RepositoryImpl {
-	return &RepositoryImpl{log: log, queries: q}
+func NewRepository(pool *pgxpool.Pool) *RepositoryImpl {
+	return &RepositoryImpl{pool: pool}
 }
 
-func (s *RepositoryImpl) Get(ctx context.Context, chann string) (*Channel, error) {
-	channel, err := s.queries.Select(ctx, chann)
+func (s *RepositoryImpl) Get(ctx context.Context, chann string) (*d.Channel, error) {
+	q := queriesAdapter{queries: db.New(s.pool)}
+
+	channel, err := q.Select(ctx, chann)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Channel{
+	return &d.Channel{
 		Name:            channel.Name,
 		Background:      channel.Background,
 		IsBanned:        channel.IsBanned.Bool,
@@ -34,6 +39,6 @@ func (s *RepositoryImpl) Get(ctx context.Context, chann string) (*Channel, error
 	}, nil
 }
 
-func (s *RepositoryImpl) Update(ctx context.Context, upd ChannelUpdate) error {
+func (s *RepositoryImpl) Update(ctx context.Context, upd d.ChannelUpdate) error {
 	return errors.New("not implemented")
 }

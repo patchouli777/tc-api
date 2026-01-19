@@ -17,44 +17,21 @@ type Getter interface {
 	GetByUsername(ctx context.Context, username string) (*d.Livestream, error)
 }
 
-type Creater interface {
-	Create(ctx context.Context, cr d.LivestreamCreate) (*d.Livestream, error)
-}
-
-type Updater interface {
-	Update(ctx context.Context, id int, upd d.LivestreamUpdate) (*d.Livestream, error)
-	UpdateViewers(ctx context.Context, id int, viewers int) error
-	UpdateThumbnail(ctx context.Context, id int, thumbnail string) error
-}
-
 type Lister interface {
 	List(ctx context.Context, s d.LivestreamSearch) ([]d.Livestream, error)
 }
 
-type Deleter interface {
-	Delete(ctx context.Context, id int) (bool, error)
-}
-
-type Repository interface {
-	Getter
-	Creater
-	Updater
-	Lister
-	Deleter
-}
-
-type GetterListerUpdater interface {
+type GetterLister interface {
 	Getter
 	Lister
-	Updater
 }
 
 type Handler struct {
-	r   GetterListerUpdater
+	r   GetterLister
 	log *slog.Logger
 }
 
-func NewHandler(log *slog.Logger, r GetterListerUpdater) *Handler {
+func NewHandler(log *slog.Logger, r GetterLister) *Handler {
 	return &Handler{r: r, log: log}
 }
 

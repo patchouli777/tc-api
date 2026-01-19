@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"main/internal/app/auth"
+	d "main/internal/follow/domain"
 	"main/internal/lib/handler"
 	api "main/pkg/api/follow"
 	"net/http"
@@ -12,8 +13,8 @@ import (
 
 type Repository interface {
 	IsFollower(ctx context.Context, follower, followed string) (bool, error)
-	List(ctx context.Context, follower string) ([]FollowerListItem, error)
-	ListExtended(ctx context.Context, follower string) ([]FollowingListExtendedItem, error)
+	List(ctx context.Context, follower string) ([]d.FollowerListItem, error)
+	ListExtended(ctx context.Context, follower string) ([]d.FollowingListExtendedItem, error)
 	Follow(ctx context.Context, follower, followed string) error
 	Unfollow(ctx context.Context, unfollower, unfollowed string) error
 }
@@ -47,7 +48,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	followed := r.URL.Query().Get("followed")
 	if followed == "" {
-		handler.Error(h.log, w, op, errNoFollowed, http.StatusBadRequest, errNoFollowed.Error())
+		handler.Error(h.log, w, op, d.ErrNoFollowed, http.StatusBadRequest, d.ErrNoFollowed.Error())
 		return
 	}
 
@@ -80,7 +81,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	follower := r.URL.Query().Get("follower")
 
 	if follower == "" {
-		handler.Error(h.log, w, op, errNoFollower, http.StatusBadRequest, errNoFollower.Error())
+		handler.Error(h.log, w, op, d.ErrNoFollower, http.StatusBadRequest, d.ErrNoFollower.Error())
 		return
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"main/internal/external/db"
+	d "main/internal/user/domain"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -18,7 +19,7 @@ func (q *queriesAdapter) Select(ctx context.Context, id int32) (db.UserSelectRow
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return db.UserSelectRow{}, errNotFound
+			return db.UserSelectRow{}, d.ErrNotFound
 		}
 
 		return db.UserSelectRow{}, err
@@ -32,7 +33,7 @@ func (q *queriesAdapter) SelectByUsername(ctx context.Context, username string) 
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return db.UserSelectByUsernameRow{}, errNotFound
+			return db.UserSelectByUsernameRow{}, d.ErrNotFound
 		}
 
 		return db.UserSelectByUsernameRow{}, err
@@ -48,7 +49,7 @@ func (q *queriesAdapter) Insert(ctx context.Context, p db.UserInsertParams) erro
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == db.CodeUniqueConstraint {
-				return errAlreadyExists
+				return d.ErrAlreadyExists
 			}
 		}
 
@@ -65,7 +66,7 @@ func (q *queriesAdapter) Update(ctx context.Context, arg db.UserUpdateParams) er
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == db.CodeUniqueConstraint {
-				return errAlreadyExists
+				return d.ErrAlreadyExists
 			}
 		}
 

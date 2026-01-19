@@ -1,4 +1,4 @@
-package channel
+package domain
 
 import (
 	"main/internal/lib/null"
