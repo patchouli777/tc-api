@@ -11,6 +11,7 @@ import (
 	api "main/pkg/api/user"
 	"net/http"
 	"strconv"
+	"unicode/utf8"
 )
 
 type Repository interface {
@@ -95,28 +96,32 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	errs := make(map[string]error)
+
 	if req.Name == "" {
-		handler.Error(h.log, w, op, d.ErrUsernameRequired, http.StatusBadRequest, d.ErrUsernameRequired.Error())
-		return
+		errs["name"] = d.ErrUsernameRequired
 	}
 
 	if req.Password == "" {
-		handler.Error(h.log, w, op, d.ErrPasswordRequired, http.StatusBadRequest, d.ErrPasswordRequired.Error())
+		errs["password"] = d.ErrPasswordRequired
+	}
+
+	if req.Password != "" && utf8.RuneCountInString(req.Password) < 8 {
+		errs["password"] = d.ErrWeakPassword
+	}
+
+	if len(errs) != 0 {
+		handler.Errors(h.log, w, op, http.StatusBadRequest, errs)
 		return
 	}
 
 	if err := h.s.Create(r.Context(), d.UserCreate{
 		Name:     req.Name,
 		Password: req.Password,
-		Pfp:      *req.Pfp,
+		Pfp:      req.Pfp,
 	}); err != nil {
 		if errors.Is(err, d.ErrAlreadyExists) {
 			handler.Error(h.log, w, op, err, http.StatusConflict, d.ErrAlreadyExists.Error())
-			return
-		}
-
-		if errors.Is(err, d.ErrWeakPassword) {
-			handler.Error(h.log, w, op, err, http.StatusBadRequest, d.ErrWeakPassword.Error())
 			return
 		}
 
@@ -225,7 +230,6 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: int check instead of username + staff check
 	if user.Role != auth.RoleStaff {
 		if user.Id != int32(idInt) {
 			handler.Error(h.log, w, op, handler.ErrIdentity, http.StatusBadRequest, handler.MsgIdentity)

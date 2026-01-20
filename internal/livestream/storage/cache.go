@@ -70,6 +70,7 @@ func (r *cache) get(ctx context.Context, id int) (*d.Livestream, error) {
 	return ls, nil
 }
 
+// TODO: if category is empty just list sorted (might need an additional store)
 func (r *cache) list(ctx context.Context, category string, page, count int) ([]d.Livestream, error) {
 	ids, err := r.sorted.get(ctx, category, page, count)
 	if err != nil {

@@ -117,10 +117,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		page = "1"
 	}
 
+	errs := make(map[string]error)
+
 	pageInt, err := strconv.Atoi(page)
 	if err != nil {
-		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgBadPage)
-		return
+		errs["page"] = handler.ErrBadPage
 	}
 
 	if pageInt < 1 {
@@ -134,7 +135,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	countInt, err := strconv.Atoi(count)
 	if err != nil {
-		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgBadCount)
+		errs["count"] = handler.ErrBadCount
+	}
+
+	if len(errs) != 0 {
+		handler.Errors(h.log, w, op, http.StatusBadRequest, errs)
 		return
 	}
 

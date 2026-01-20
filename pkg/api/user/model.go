@@ -18,9 +18,9 @@ type GetResponse struct {
 }
 
 type PostRequest struct {
-	Name     string  `json:"name"`
-	Password string  `json:"password"`
-	Pfp      *string `json:"pfp"`
+	Name     string      `json:"name"`
+	Password string      `json:"password"`
+	Pfp      null.String `json:"pfp"`
 }
 type PostResponse struct{}
 

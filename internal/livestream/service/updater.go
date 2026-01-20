@@ -21,10 +21,12 @@ import (
 type Store interface {
 	Create(ctx context.Context, cr d.LivestreamCreate) (*d.Livestream, error)
 	Update(ctx context.Context, id int, upd d.LivestreamUpdate) (*d.Livestream, error)
+	List(ctx context.Context, s d.LivestreamSearch) ([]d.Livestream, error)
 	UpdateViewers(ctx context.Context, id int, viewers int) error
 	UpdateThumbnail(ctx context.Context, id int, thumbnail string) error
 }
 
+// TODO: add polling count, polling timeout to config
 type UpdateScheduler struct {
 	log   *slog.Logger
 	ssa   *streamserver.Adapter
@@ -36,6 +38,61 @@ type UpdateScheduler struct {
 	rdb        *redis.Client
 }
 
+func NewUpdateScheduler(log *slog.Logger,
+	rdb *redis.Client,
+	ssa *streamserver.Adapter,
+	lsr Store,
+	sched *asynq.Scheduler,
+	instanceID string) *UpdateScheduler {
+	entries, err := os.ReadDir("./static/livestreamthumbs")
+	if err != nil {
+		log.Error("Unable to read ./static/livestreamthumbs. Cancelling updates for livestreams.", sl.Err(err))
+		return nil
+	}
+
+	log = log.With(slog.String("instance_id", instanceID))
+
+	return &UpdateScheduler{
+		log:        log,
+		ssa:        ssa,
+		lsr:        lsr,
+		sched:      sched,
+		previews:   entries,
+		instanceID: instanceID,
+		rdb:        rdb}
+}
+
+// TODO: ttl
+func (s *UpdateScheduler) Run(ctx context.Context, timeout time.Duration) {
+	err := s.startup(ctx)
+	if err != nil {
+		s.log.Info("startup", sl.Err(err))
+	}
+
+	go func() {
+		err := s.PollSRS(ctx)
+		if err != nil {
+			s.log.Error("poll srs", sl.Err(err))
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.Tick(timeout):
+			go func() {
+				err := s.PollSRS(ctx)
+				if err != nil {
+					s.log.Error("poll srs", sl.Err(err))
+					return
+				}
+				s.log.Info(fmt.Sprintf("Livestreams updated. Next in %v", timeout))
+			}()
+		}
+	}
+}
+
 const (
 	TypeLivestreamUpdate = "livestream:update"
 )
@@ -45,43 +102,7 @@ type livestreamTaskPayload struct {
 	Username     string
 }
 
-// TODO: ttl
-func (s *UpdateScheduler) Run(ctx context.Context, timeout time.Duration) {
-	// if err := s.Register(ctx); err != nil {
-	// 	s.log.Error("register failed", sl.Err(err))
-	// }
-
-	// go func() {
-	// 	err := s.PollSRS(ctx)
-	// 	if err != nil {
-	// 		s.log.Error("poll srs", sl.Err(err))
-	// 	}
-	// }()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.Tick(timeout):
-			if err := s.Register(ctx); err != nil {
-				s.log.Error("register failed", sl.Err(err))
-			}
-
-			go func() {
-				err := s.PollSRS(ctx)
-				if err != nil {
-					s.log.Error("poll srs", sl.Err(err))
-				}
-				s.log.Info(fmt.Sprintf("Livestreams updated. Next in %v", timeout))
-			}()
-		}
-	}
-}
-
-func (s *UpdateScheduler) Register(ctx context.Context) error {
-	return s.rdb.Set(ctx, s.pollerKey(), time.Now().Unix(), 60*time.Second).Err()
-}
-
+// polls srs and registers new update tasks
 func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
 	lockValue := s.instanceID + ":" + strconv.FormatInt(time.Now().Unix(), 10)
 
@@ -123,65 +144,23 @@ func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
 				continue
 			}
 
-			payload, err := json.Marshal(livestreamTaskPayload{LivestreamID: ls.Id, Username: ls.UserName})
+			err = s.newTask(ls)
 			if err != nil {
-				s.log.Error("error creating payload", sl.Err(err))
-				return err
+				s.log.Error("registering new task", sl.Err(err))
 			}
-
-			_, err = s.sched.Register("@every 15s", asynq.NewTask(TypeLivestreamUpdate, payload))
-			if err != nil {
-				s.log.Error("error registering new task", sl.Err(err))
-				return err
-			}
+			start += count
 		}
 	}
 
 	return nil
 }
 
-func NewUpdateScheduler(log *slog.Logger,
-	rdb *redis.Client,
-	ssa *streamserver.Adapter,
-	lsr Store,
-	sched *asynq.Scheduler,
-	instanceID string) *UpdateScheduler {
-	entries, err := os.ReadDir("./static/livestreamthumbs")
-	if err != nil {
-		log.Error("Unable to read ./static/livestreamthumbs. Cancelling updates for livestreams.", sl.Err(err))
-		return nil
-	}
-
-	log = log.With(slog.String("instance_id", instanceID))
-
-	return &UpdateScheduler{
-		log:        log,
-		ssa:        ssa,
-		lsr:        lsr,
-		sched:      sched,
-		previews:   entries,
-		instanceID: instanceID,
-		rdb:        rdb}
-}
-
-func (s *UpdateScheduler) pollerKey() string {
-	return fmt.Sprintf("go_poller:%s", s.instanceID)
-}
-
-// func (s *UpdateScheduler) NewUpdateTask(id, username string) (*asynq.Task, error) {
-// 	payload, err := json.Marshal(livestreamTaskPayload{LivestreamID: id, Username: username})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return asynq.NewTask(TypeLivestreamUpdate, payload), nil
-// }
-
 func (s *UpdateScheduler) HandleUpdateTask(ctx context.Context, t *asynq.Task) error {
 	var p livestreamTaskPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return err
 	}
-	s.log.Info("Handling update task",
+	s.log.Debug("Handling update task",
 		slog.String("user", p.Username),
 		slog.Int("id", p.LivestreamID))
 
@@ -206,6 +185,49 @@ func (s *UpdateScheduler) HandleUpdateTask(ctx context.Context, t *asynq.Task) e
 	thumbnailId := rand.Intn(len(s.previews))
 	thumbnail := s.previews[thumbnailId].Name()
 	err = s.lsr.UpdateThumbnail(ctx, p.LivestreamID, "livestreamthumbs/"+thumbnail)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *UpdateScheduler) startup(ctx context.Context) error {
+	moreStreams := true
+	page := 1
+	count := 500
+	for moreStreams {
+		livestreams, err := s.lsr.List(ctx, d.LivestreamSearch{
+			Page:  page,
+			Count: count,
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, ls := range livestreams {
+			s.newTask(&ls)
+		}
+
+		if len(livestreams) < count {
+			moreStreams = false
+		}
+
+		page += 1
+	}
+
+	return nil
+}
+
+func (s *UpdateScheduler) newTask(ls *d.Livestream) error {
+	payload, err := json.Marshal(livestreamTaskPayload{LivestreamID: ls.Id, Username: ls.UserName})
+	if err != nil {
+		return err
+	}
+
+	// TODO: save {entry: entryId, livestream: ls.Id} to delete task later
+	// register new task with taskId = asynq.TaskID to make sure there is no duplicate update tasks for a given livestream
+	_, err = s.sched.Register("@every 15s", asynq.NewTask(TypeLivestreamUpdate, payload), asynq.TaskID(strconv.Itoa(ls.Id)))
 	if err != nil {
 		return err
 	}

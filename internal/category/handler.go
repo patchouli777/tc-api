@@ -36,17 +36,12 @@ type Deleter interface {
 	DeleteByLink(ctx context.Context, link string) error
 }
 
-type ViewerUpdater interface {
-	UpdateViewers(ctx context.Context, id int, viewers int) error
-}
-
 type Repository interface {
 	Getter
 	Lister
 	Creater
 	Deleter
 	Updater
-	ViewerUpdater
 }
 
 type Handler struct {
@@ -125,11 +120,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	if page == "" {
 		page = "1"
 	}
+	errs := make(map[string]error)
 
 	pageInt, err := strconv.Atoi(page)
 	if err != nil {
-		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgBadPage)
-		return
+		errs["page"] = handler.ErrBadPage
 	}
 
 	if count == "" {
@@ -138,8 +133,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	countInt, err := strconv.Atoi(count)
 	if err != nil {
-		handler.Error(h.log, w, op, err, http.StatusBadRequest, handler.MsgBadCount)
-		return
+		errs["count"] = handler.ErrBadCount
 	}
 
 	if sort == "" {
@@ -147,7 +141,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sort != "asc" && sort != "desc" {
-		handler.Error(h.log, w, op, handler.ErrBadSort, http.StatusBadRequest, handler.MsgBadSort)
+		errs["sort"] = handler.ErrBadSort
+	}
+
+	if len(errs) != 0 {
+		handler.Errors(h.log, w, op, http.StatusBadRequest, errs)
 		return
 	}
 

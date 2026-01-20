@@ -39,9 +39,10 @@ func (r *RepositoryImpl) Get(ctx context.Context, id int32) (*d.User, error) {
 func (r *RepositoryImpl) Create(ctx context.Context, u d.UserCreate) error {
 	q := queriesAdapter{queries: db.New(r.pool)}
 
-	err := q.Insert(ctx, db.UserInsertParams{Name: u.Name,
+	err := q.Insert(ctx, db.UserInsertParams{
+		Name:     u.Name,
 		Password: u.Password,
-		Pfp:      pgtype.Text{String: u.Pfp, Valid: true}})
+		Pfp:      pgtype.Text{String: u.Pfp.Value, Valid: u.Pfp.Explicit && !u.Pfp.IsNull}})
 
 	return err
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"main/internal/lib/sl"
 	"net/http"
 )
 
@@ -27,20 +26,20 @@ func (u *Adapter) List(ctx context.Context, start, count int) (*ListResponse, er
 	cl := &http.Client{}
 	response, err := cl.Get(fmt.Sprintf("%s?start=%d&count=%d", u.endpoint, start, count))
 	if err != nil {
-		u.log.Error("get livestreams", sl.Err(err), sl.Op(op))
+		// u.log.Error("get livestreams", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 	defer response.Body.Close() // nolint
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		u.log.Error("parse response", sl.Err(err), sl.Op(op))
+		// u.log.Error("parse response", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 
 	var resp ListResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		u.log.Error("unmarshal response", sl.Err(err), sl.Op(op))
+		// u.log.Error("unmarshal response", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 
@@ -53,20 +52,20 @@ func (u *Adapter) Get(ctx context.Context, channel string) (*GetResponse, error)
 	cl := &http.Client{}
 	response, err := cl.Get(u.endpoint + "/" + channel)
 	if err != nil {
-		u.log.Error("get livestream", sl.Err(err), sl.Op(op), slog.String("channel", channel))
+		// u.log.Error("get livestream", sl.Err(err), sl.Op(op), slog.String("channel", channel))
 		return nil, err
 	}
 	defer response.Body.Close() // nolint
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		u.log.Error("parse response", sl.Err(err), sl.Op(op))
+		// u.log.Error("parse response", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 
 	var resp GetResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		u.log.Error("unmarshal response", sl.Err(err), sl.Op(op))
+		// u.log.Error("unmarshal response", sl.Err(err), sl.Op(op))
 		return nil, err
 	}
 

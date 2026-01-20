@@ -22,7 +22,7 @@ type User struct {
 type UserCreate struct {
 	Name     string
 	Password string
-	Pfp      string
+	Pfp      null.String
 }
 
 type UserUpdate struct {

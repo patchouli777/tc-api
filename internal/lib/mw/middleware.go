@@ -68,7 +68,7 @@ func PanicRecovery(log *slog.Logger) func(http.Handler) http.Handler {
 				if rcv := recover(); rcv != nil {
 					log.Error("recover after panic: %v\n. stack trace:\n%s", rcv, debug.Stack())
 					w.WriteHeader(http.StatusInternalServerError)
-					json.NewEncoder(w).Encode(handler.ErrorResponse{Success: false, Error: "internal error"})
+					json.NewEncoder(w).Encode(handler.ErrorResponse{Success: false, Errors: map[string]string{"unknown": "internal error"}})
 					return
 				}
 			}()

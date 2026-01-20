@@ -35,6 +35,7 @@ func (r *RepositoryImpl) GetByUsername(ctx context.Context, username string) (*d
 	return nil, errors.New("not implemented")
 }
 
+// TODO: category id is 0
 func (r *RepositoryImpl) List(ctx context.Context, s d.LivestreamSearch) ([]d.Livestream, error) {
 	return r.cache.list(ctx, s.Category, s.Page, s.Count)
 }
