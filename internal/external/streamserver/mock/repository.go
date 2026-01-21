@@ -28,6 +28,12 @@ func (u *repository) Get(ctx context.Context, id string) (livestream, error) {
 }
 
 func (u *repository) Start(ctx context.Context, username string) error {
+	for _, ls := range u.livestreams {
+		if ls.channel == username {
+			return nil
+		}
+	}
+
 	u.livestreams = append(u.livestreams, livestream{channel: username, viewers: 0})
 	return nil
 }

@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"main/internal/app"
-	"main/internal/auth"
+	streamservermock "main/internal/external/streamserver/mock"
 	"main/internal/lib/setup"
 	"main/internal/lib/sl"
-	"main/internal/lib/streamservermock"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -68,7 +67,7 @@ func TestMain(m *testing.M) {
 		}
 	}()
 
-	grpcClient, err := initGRPC(cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
+	grpcClient, err := app.NewAuthClient(log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
 	if err != nil {
 		log.Error("unable to init grpc client", sl.Err(err))
 		os.Exit(1)
@@ -84,11 +83,13 @@ func TestMain(m *testing.M) {
 
 	services := app.NewApp(ctx,
 		log,
-		cfg.InstanceID.String(),
-		cfg.Env,
-		grpcClient,
 		rclient,
-		pgpool)
+		pgpool,
+		grpcClient,
+		cfg.Env,
+		cfg.InstanceID.String(),
+		cfg.StreamServer,
+		cfg.Asynq)
 
 	setup.RecreateSchema(pgpool, rclient)
 	// setup.Populate(ctx, pgpool,
@@ -205,8 +206,4 @@ func initPostgres(ctx context.Context, cfg app.PostgresConfig) (*dockertest.Reso
 	}
 
 	return pgRes, nil
-}
-
-func initGRPC(env string, mock bool, cfg app.GrpcClientConfig) (auth.Client, error) {
-	return app.NewAuthClient(log, env, mock, cfg)
 }

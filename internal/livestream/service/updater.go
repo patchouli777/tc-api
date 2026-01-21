@@ -94,10 +94,10 @@ func (s *UpdateScheduler) Run(ctx context.Context, timeout time.Duration) {
 }
 
 const (
-	TypeLivestreamUpdate = "livestream:update"
+	TaskTypeUpdate = "livestream:update"
 )
 
-type livestreamTaskPayload struct {
+type updateTaskPayload struct {
 	LivestreamID int
 	Username     string
 }
@@ -156,7 +156,7 @@ func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
 }
 
 func (s *UpdateScheduler) HandleUpdateTask(ctx context.Context, t *asynq.Task) error {
-	var p livestreamTaskPayload
+	var p updateTaskPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return err
 	}
@@ -220,14 +220,14 @@ func (s *UpdateScheduler) startup(ctx context.Context) error {
 }
 
 func (s *UpdateScheduler) newTask(ls *d.Livestream) error {
-	payload, err := json.Marshal(livestreamTaskPayload{LivestreamID: ls.Id, Username: ls.UserName})
+	payload, err := json.Marshal(updateTaskPayload{LivestreamID: ls.Id, Username: ls.UserName})
 	if err != nil {
 		return err
 	}
 
 	// TODO: save {entry: entryId, livestream: ls.Id} to delete task later
 	// register new task with taskId = asynq.TaskID to make sure there is no duplicate update tasks for a given livestream
-	_, err = s.sched.Register("@every 15s", asynq.NewTask(TypeLivestreamUpdate, payload), asynq.TaskID(strconv.Itoa(ls.Id)))
+	_, err = s.sched.Register("@every 15s", asynq.NewTask(TaskTypeUpdate, payload), asynq.TaskID(strconv.Itoa(ls.Id)))
 	if err != nil {
 		return err
 	}

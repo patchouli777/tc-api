@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"log/slog"
+	"main/internal/app"
+	"main/internal/lib/sl"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"main/internal/app"
-	"main/internal/lib/sl"
 )
 
 //	@title			Swagger Example API

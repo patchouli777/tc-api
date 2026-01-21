@@ -11,9 +11,9 @@ import (
 	categoryStorage "main/internal/category/storage"
 	"main/internal/external/streamserver"
 	streamservermock "main/internal/external/streamserver/mock"
-	follow "main/internal/follow/storage"
 	followStorage "main/internal/follow/storage"
 	userStorage "main/internal/user/storage"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,16 +26,45 @@ func Populate(ctx context.Context,
 	fs *followStorage.RepositoryImpl,
 	us *userStorage.RepositoryImpl,
 	streamServerBaseUrl string) {
-	addTags(ctx, pool)
-	addCategories(ctx, cr)
-	addUsers(ctx, pool)
-	addFollows(ctx, fs)
-	startLivestreams(cr, ls, streamServerBaseUrl)
+
+	slog.Info("adding tags")
+	t := withTime(func() {
+		addTags(ctx, pool)
+	})
+	slog.Info("tags added", slog.Duration("took", t))
+
+	slog.Info("adding categories")
+	t = withTime(func() {
+		addCategories(ctx, cr)
+	})
+	slog.Info("categories added", slog.Duration("took", t))
+
+	slog.Info("adding users")
+	t = withTime(func() {
+		addUsers(ctx, pool)
+	})
+	slog.Info("users added", slog.Duration("took", t))
+
+	slog.Info("adding follows")
+	t = withTime(func() {
+		addFollows(ctx, fs)
+	})
+	slog.Info("follows added", slog.Duration("took", t))
+
+	slog.Info("starting livestreams")
+	t = withTime(func() {
+		startLivestreams(ls, streamServerBaseUrl)
+	})
+	slog.Info("livestreams started", slog.Duration("took", t))
+}
+
+func withTime(f func()) time.Duration {
+	now := time.Now()
+	f()
+	return time.Since(now)
 }
 
 func addCategories(ctx context.Context, cr *categoryStorage.RepositoryImpl) {
-	slog.Info("adding categories")
-
 	categoriesLen := min(categoriesCount, len(categories))
 	categories = categories[:categoriesLen]
 
@@ -51,26 +80,18 @@ func addCategories(ctx context.Context, cr *categoryStorage.RepositoryImpl) {
 			log.Fatalf("unable to add category: %v", err)
 		}
 	}
-
-	slog.Info("categories added")
 }
 
 func addUsers(ctx context.Context, pool *pgxpool.Pool) {
-	slog.Info("adding users")
-
 	r, err := pool.Query(ctx, usersToSQL(users))
 	if err != nil {
 		fmt.Println(usersToSQL(users))
 		log.Fatalf("unable to add users: %v", err)
 	}
 	r.Close()
-
-	slog.Info("users added")
 }
 
-func startLivestreams(cr *categoryStorage.RepositoryImpl, ls *streamserver.Adapter, baseUrl string) {
-	slog.Info("starting livestreams")
-
+func startLivestreams(ls *streamserver.Adapter, baseUrl string) {
 	cl := streamservermock.NewStreamServerClient(baseUrl)
 
 	for i := range streamsCount {
@@ -78,35 +99,25 @@ func startLivestreams(cr *categoryStorage.RepositoryImpl, ls *streamserver.Adapt
 		if err != nil {
 			log.Fatalf("unable to start livestream: %v", err)
 		}
-
 	}
-
-	slog.Info("livestreams started")
 }
 
 func addTags(ctx context.Context, pool *pgxpool.Pool) {
-	slog.Info("adding tags")
-
 	r, err := pool.Query(ctx, tagsToSQL(tags))
 	if err != nil {
 		log.Fatalf("unable to add tags: %v", err)
 	}
 	r.Close()
-
-	slog.Info("tags added")
 }
 
-func addFollows(ctx context.Context, fs *follow.RepositoryImpl) {
-	slog.Info("adding follows")
-
+// TODO: sql instead of repo
+func addFollows(ctx context.Context, fs *followStorage.RepositoryImpl) {
 	for i := range followCount {
 		err := fs.Follow(ctx, "user1", fmt.Sprintf("user%d", i))
 		if err != nil {
 			log.Fatalf("unable to follow a user: %v", err)
 		}
 	}
-
-	slog.Info("follows added")
 }
 
 func usersToSQL(users []setupUser) string {

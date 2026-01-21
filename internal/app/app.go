@@ -85,7 +85,7 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 func InitApp(ctx context.Context, log *slog.Logger, r *redis.Client, instanceID string, app *App, updCfg UpdateConfig, ssCfg StreamServerConfig) {
 	asyncqMux := asynq.NewServeMux()
 	updSched := livestreamService.NewUpdateScheduler(log, r, app.StreamServerAdapter, app.LivestreamRepo, app.TaskScheduler, instanceID)
-	asyncqMux.HandleFunc(livestreamService.TypeLivestreamUpdate, updSched.HandleUpdateTask)
+	asyncqMux.HandleFunc(livestreamService.TaskTypeUpdate, updSched.HandleUpdateTask)
 
 	go func() {
 		if err := app.TaskQServer.Run(asyncqMux); err != nil {
