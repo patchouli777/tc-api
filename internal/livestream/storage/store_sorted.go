@@ -47,3 +47,42 @@ func (r *sortedIDStore) deleteTx(ctx context.Context, tx redis.Pipeliner, catego
 func (r *sortedIDStore) key(category string) string {
 	return fmt.Sprintf("livestreams_ids_sorted:%s", category)
 }
+
+type sortedIDAllStore struct {
+	rdb *redis.Client
+}
+
+func (r *sortedIDAllStore) get(ctx context.Context, page, count int) ([]int, error) {
+	res, err := r.rdb.ZRevRangeByScore(ctx, r.key(), &redis.ZRangeBy{
+		Offset: int64((page - 1) * count),
+		Count:  int64(count),
+		Min:    "0",
+		Max:    "999999999",
+	}).Result()
+	if err != nil {
+		return nil, fmt.Errorf("unable to find livestreams at all: %v", err)
+	}
+
+	ids := make([]int, len(res))
+	for i, idStr := range res {
+		id, _ := strconv.Atoi(idStr)
+		ids[i] = id
+	}
+
+	return ids, nil
+}
+
+func (r *sortedIDAllStore) addTx(ctx context.Context, tx redis.Pipeliner, score int, id int) *redis.IntCmd {
+	return tx.ZAdd(ctx, r.key(), redis.Z{
+		Score:  float64(score),
+		Member: id,
+	})
+}
+
+func (r *sortedIDAllStore) deleteTx(ctx context.Context, tx redis.Pipeliner) *redis.IntCmd {
+	return tx.Del(ctx, r.key())
+}
+
+func (r *sortedIDAllStore) key() string {
+	return fmt.Sprintf("livestreams_ids_sorted:all")
+}

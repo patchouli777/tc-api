@@ -2,8 +2,8 @@ package domain
 
 import (
 	"encoding/json"
-	"main/internal/lib/null"
-	api "main/pkg/api/category"
+	"twitchy-api/internal/lib/null"
+	api "twitchy-api/pkg/api/category"
 )
 
 type CategoryTag struct {

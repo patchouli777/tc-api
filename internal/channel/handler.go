@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	d "main/internal/channel/domain"
-	"main/internal/lib/handler"
-	api "main/pkg/api/channel"
 	"net/http"
+	d "twitchy-api/internal/channel/domain"
+	"twitchy-api/internal/lib/handler"
+	api "twitchy-api/pkg/api/channel"
 )
 
 type Repository interface {

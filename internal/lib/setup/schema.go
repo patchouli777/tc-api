@@ -2,6 +2,7 @@ package setup
 
 import (
 	"context"
+	"twitchy-api/internal/app"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -18,11 +19,13 @@ func RecreateSchema(pool *pgxpool.Pool, rdb *redis.Client) {
 
 	db := stdlib.OpenDBFromPool(pool)
 
-	if err := goose.DownTo(db, "internal/external/db/migrations", 0); err != nil {
+	root := app.GetProjectRoot()
+
+	if err := goose.DownTo(db, root+"/internal/external/db/migrations", 0); err != nil {
 		panic(err)
 	}
 
-	if err := goose.UpTo(db, "internal/external/db/migrations", 99999); err != nil {
+	if err := goose.UpTo(db, root+"/internal/external/db/migrations", 99999); err != nil {
 		panic(err)
 	}
 

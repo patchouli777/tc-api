@@ -1,8 +1,8 @@
 package domain
 
 import (
-	"main/internal/lib/null"
 	"time"
+	"twitchy-api/internal/lib/null"
 )
 
 type Channel struct {

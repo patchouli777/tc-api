@@ -2,8 +2,8 @@ package auth
 
 import (
 	"context"
-	"main/internal/app/auth"
 	"time"
+	"twitchy-api/internal/app/auth"
 
 	"github.com/golang-jwt/jwt/v5"
 )

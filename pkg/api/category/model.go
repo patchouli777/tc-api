@@ -1,7 +1,7 @@
 package category
 
 import (
-	"main/internal/lib/null"
+	"twitchy-api/internal/lib/null"
 )
 
 type CategoryTag struct {

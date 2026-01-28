@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	d "main/internal/category/domain"
+	d "twitchy-api/internal/category/domain"
 
 	"github.com/redis/go-redis/v9"
 )

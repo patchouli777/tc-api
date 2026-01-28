@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"main/internal/app/auth"
-	"main/internal/lib/handler"
-	d "main/internal/user/domain"
-	api "main/pkg/api/user"
 	"net/http"
 	"strconv"
+	"twitchy-api/internal/app/auth"
+	"twitchy-api/internal/lib/handler"
+	d "twitchy-api/internal/user/domain"
+	api "twitchy-api/pkg/api/user"
 	"unicode/utf8"
 )
 

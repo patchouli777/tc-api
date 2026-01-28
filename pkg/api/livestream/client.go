@@ -1,24 +1,23 @@
 package livestream
 
 import (
-	"log/slog"
-	"main/internal/lib/null"
-	baseclient "main/pkg/api/client"
 	"net/http"
+	"twitchy-api/internal/lib/null"
+	baseclient "twitchy-api/pkg/api/client"
 )
 
-type LivestreamClient struct {
+type Client struct {
 	base    *baseclient.Client
 	BaseURL string
 }
 
-func NewLivestreamClient(log *slog.Logger) *LivestreamClient {
-	return &LivestreamClient{
+func NewClient(url string) *Client {
+	return &Client{
 		base:    baseclient.NewClient(),
-		BaseURL: "http://localhost:8090/api/livestreams"}
+		BaseURL: url}
 }
 
-func (c *LivestreamClient) Get(channel string) (*http.Response, error) {
+func (c *Client) Get(channel string) (*http.Response, error) {
 	r := GetRequest{Channel: channel}
 
 	req, err := c.base.Get(c.BaseURL + r.Channel)
@@ -30,7 +29,7 @@ func (c *LivestreamClient) Get(channel string) (*http.Response, error) {
 	return c.base.Client.Do(req)
 }
 
-func (c *LivestreamClient) List() (*http.Response, error) {
+func (c *Client) List() (*http.Response, error) {
 	req, err := c.base.Get(c.BaseURL)
 	if err != nil {
 		return nil, err
@@ -40,7 +39,7 @@ func (c *LivestreamClient) List() (*http.Response, error) {
 	return c.base.Client.Do(req)
 }
 
-func (c *LivestreamClient) Patch(username, title string, categoryId int) (*http.Response, error) {
+func (c *Client) Patch(username, title string, categoryId int) (*http.Response, error) {
 	data := PatchRequest{
 		Title: null.String{
 			Value:    title,

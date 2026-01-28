@@ -2,9 +2,9 @@ package mock
 
 import (
 	"encoding/json"
-	"main/internal/external/streamserver"
 	"net/http"
 	"slices"
+	"twitchy-api/internal/external/streamserver"
 )
 
 func (s *handler) Subscribe(w http.ResponseWriter, r *http.Request) {

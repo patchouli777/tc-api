@@ -1,8 +1,8 @@
 package user
 
 import (
-	"main/internal/lib/null"
 	"time"
+	"twitchy-api/internal/lib/null"
 )
 
 type User struct {

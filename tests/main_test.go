@@ -3,15 +3,15 @@ package test
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"log/slog"
-	"main/internal/app"
-	streamservermock "main/internal/external/streamserver/mock"
-	"main/internal/lib/setup"
-	"main/internal/lib/sl"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
+	application "twitchy-api/internal/app"
+	streamservermock "twitchy-api/internal/external/streamserver/mock"
+	"twitchy-api/internal/lib/setup"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -25,85 +25,71 @@ var (
 	rclient *redis.Client
 	pool    *dockertest.Pool
 	ts      *httptest.Server
-	log     *slog.Logger
+	logger  *slog.Logger
+	app     *application.App
 )
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
-	cfg := app.GetConfig()
-
-	log = app.NewLogger(cfg.Logger)
-	log.With(slog.String("env", "tests"))
-	slog.SetDefault(log)
+	cfg := application.GetConfig()
+	logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	dockerPool, err := initDockerPool()
 	if err != nil {
-		log.Error("unable to init docker pool", sl.Err(err))
-		os.Exit(1)
+		log.Fatalf("unable to init docker pool: %v", err)
 	}
 	pool = dockerPool
 
 	redisRes, err := initRedis(ctx, cfg.Redis)
 	if err != nil {
-		log.Error("unable to init redis", sl.Err(err))
-		os.Exit(1)
+		log.Fatalf("unable to init redis: %v", err)
 	}
 
 	defer func() {
 		if err := pool.Purge(redisRes); err != nil {
-			log.Error("unable to purge redis resource", sl.Err(err))
+			log.Fatalf("unable to purge redis resource: %v", err)
 		}
 	}()
 
 	pgRes, err := initPostgres(ctx, cfg.Postgres)
 	if err != nil {
-		log.Error("unable to init postgres", sl.Err(err))
-		os.Exit(1)
+		log.Fatalf("unable to init postgres: %v", err)
 	}
 
 	defer func() {
 		if err := pool.Purge(pgRes); err != nil {
-			log.Error("unable to purge pg resource", sl.Err(err))
+			log.Fatalf("unable to purge pg resource: %v", err)
 		}
 	}()
-
-	grpcClient, err := app.NewAuthClient(log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
-	if err != nil {
-		log.Error("unable to init grpc client", sl.Err(err))
-		os.Exit(1)
-	}
 
 	go func() {
-		err = streamservermock.Run(ctx)
+		err = streamservermock.Run(ctx, logger)
 		if err != nil {
-			log.Error("unable to init stream server mock", sl.Err(err))
-			os.Exit(1)
+			log.Fatalf("unable to init stream server mock: %v", err)
 		}
 	}()
 
-	services := app.NewApp(ctx,
-		log,
+	app, err = application.NewApp(logger,
 		rclient,
 		pgpool,
-		grpcClient,
-		cfg.Env,
-		cfg.InstanceID.String(),
-		cfg.StreamServer,
-		cfg.Asynq)
+		cfg)
+	if err != nil {
+		// TODO:
+	}
 
 	setup.RecreateSchema(pgpool, rclient)
-	// setup.Populate(ctx, pgpool,
-	// 	services.Auth,
-	// 	services.StreamServerAdapter,
-	// 	services.Category,
-	// 	services.Follow,
-	// 	services.User)
-	// services.StreamServerAdapter.Update(ctx, cfg.Update.LivestreamsTimeout)
-	// services.CategoryUpdater.Update(ctx, cfg.Update.CategoriesTimeout)
+	// setup.Populate(ctx,
+	// 	pgpool,
+	// 	app.AuthService,
+	// 	app.StreamServerAdapter,
+	// 	app.CategoryRepo,
+	// 	app.FollowRepo,
+	// 	app.UserRepo,
+	// 	"http://127.0.0.1:1985/api/streams")
 
-	authMw := app.NewAuthMiddleware(log, false)
-
-	handler := app.CreateHandler(ctx, log, authMw, services)
+	// app.Init(ctx, cfg.Update)
+	authMw := application.NewAuthMiddleware(logger, false)
+	handler := app.CreateHandler(authMw)
 	ts = httptest.NewServer(handler)
 	defer ts.Close()
 
@@ -113,13 +99,11 @@ func TestMain(m *testing.M) {
 func initDockerPool() (*dockertest.Pool, error) {
 	pool, err := dockertest.NewPool("")
 	if err != nil {
-		log.Error("unable to construct dockertest pool", sl.Err(err))
 		return nil, err
 	}
 
 	err = pool.Client.Ping()
 	if err != nil {
-		log.Error("unable to connect to docker", sl.Err(err))
 		return nil, err
 	}
 
@@ -127,7 +111,7 @@ func initDockerPool() (*dockertest.Pool, error) {
 }
 
 // creates resource AND connects to redis. redis client is available as global variable "rclient"
-func initRedis(ctx context.Context, cfg app.RedisConfig) (*dockertest.Resource, error) {
+func initRedis(ctx context.Context, cfg application.RedisConfig) (*dockertest.Resource, error) {
 	redisRes, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "redis",
 		Tag:        "latest",
@@ -136,7 +120,6 @@ func initRedis(ctx context.Context, cfg app.RedisConfig) (*dockertest.Resource, 
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 	})
 	if err != nil {
-		log.Error("unable to start redis resource", sl.Err(err))
 		return nil, err
 	}
 
@@ -147,7 +130,6 @@ func initRedis(ctx context.Context, cfg app.RedisConfig) (*dockertest.Resource, 
 
 		return rclient.Ping(ctx).Err()
 	}); err != nil {
-		log.Error("unable to connect to docker", sl.Err(err))
 		return nil, err
 	}
 
@@ -155,7 +137,7 @@ func initRedis(ctx context.Context, cfg app.RedisConfig) (*dockertest.Resource, 
 }
 
 // creates resource AND connects to postgres. pgxpool is available as global variable "pgpool"
-func initPostgres(ctx context.Context, cfg app.PostgresConfig) (*dockertest.Resource, error) {
+func initPostgres(ctx context.Context, cfg application.PostgresConfig) (*dockertest.Resource, error) {
 	pgRes, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Repository: "postgres",
 		Tag:        "latest",
@@ -170,7 +152,6 @@ func initPostgres(ctx context.Context, cfg app.PostgresConfig) (*dockertest.Reso
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 	})
 	if err != nil {
-		log.Error("unable to start pg resource", sl.Err(err))
 		return nil, err
 	}
 
@@ -181,7 +162,6 @@ func initPostgres(ctx context.Context, cfg app.PostgresConfig) (*dockertest.Reso
 		hostAndPort,
 		cfg.Name)
 	// databaseUrl := fmt.Sprintf("postgres://less:123@%s/twitchclone?sslmode=disable", hostAndPort)
-	log.Info("connection to databse on url", slog.String("url", postgresConnURL))
 
 	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
 	pool.MaxWait = 30 * time.Second
@@ -201,7 +181,6 @@ func initPostgres(ctx context.Context, cfg app.PostgresConfig) (*dockertest.Reso
 
 		return nil
 	}); err != nil {
-		log.Error("unable to connect to docker", sl.Err(err))
 		return nil, err
 	}
 

@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"main/internal/external/db"
+	"twitchy-api/internal/external/db"
 )
 
 type queriesAdapter struct {

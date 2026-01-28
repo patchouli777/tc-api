@@ -1,6 +1,6 @@
 package livestream
 
-import "main/internal/lib/null"
+import "twitchy-api/internal/lib/null"
 
 type LivestreamCategory struct {
 	Id   int    `json:"id"`
@@ -13,8 +13,6 @@ type GetRequest struct {
 }
 type GetResponse struct {
 	Id            int                `json:"id"`
-	Username      string             `json:"username"`
-	Pfp           string             `json:"pfp"`
 	Title         string             `json:"title"`
 	StartedAt     int                `json:"started_at"`
 	IsLive        bool               `json:"is_live"`
@@ -23,9 +21,15 @@ type GetResponse struct {
 	IsFollowing   bool               `json:"is_following"`
 	IsSubscriber  bool               `json:"is_subscriber"`
 	Viewers       int                `json:"viewers"`
+	Channel       LivestreamChannel  `json:"channel"`
 	Category      LivestreamCategory `json:"category"`
 }
 
+type LivestreamChannel struct {
+	Id         string `json:"id"`
+	Username   string `json:"username"`
+	ProfilePic string `json:"profile_pic"`
+}
 type ListRequest struct {
 	Page  int `json:"page"`
 	Count int `json:"count"`
@@ -35,12 +39,11 @@ type ListResponse struct {
 }
 type ListResponseItem struct {
 	Id        int                `json:"id"`
-	Username  string             `json:"username"`
 	Title     string             `json:"title"`
-	Pfp       string             `json:"pfp"`
 	StartedAt int                `json:"started_at"`
 	Thumbnail string             `json:"thumbnail"`
 	Viewers   int                `json:"viewers"`
+	Channel   LivestreamChannel  `json:"channel"`
 	Category  LivestreamCategory `json:"category"`
 	// IsMultistream bool               `json:"is_multistream"`
 	// IsPartner     bool   `json:"is_partner"`

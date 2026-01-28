@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	"main/internal/app/auth"
-	d "main/internal/follow/domain"
-	"main/internal/lib/handler"
-	api "main/pkg/api/follow"
 	"net/http"
+	"twitchy-api/internal/app/auth"
+	d "twitchy-api/internal/follow/domain"
+	"twitchy-api/internal/lib/handler"
+	api "twitchy-api/pkg/api/follow"
 )
 
 type Repository interface {
@@ -86,7 +86,6 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	extended := r.URL.Query().Get("extended")
-	println(extended)
 	if extended == "true" {
 		extendedList, err := h.r.ListExtended(ctx, follower)
 		if err != nil {

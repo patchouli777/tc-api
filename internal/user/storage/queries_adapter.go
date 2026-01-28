@@ -3,8 +3,8 @@ package user
 import (
 	"context"
 	"errors"
-	"main/internal/external/db"
-	d "main/internal/user/domain"
+	"twitchy-api/internal/external/db"
+	d "twitchy-api/internal/user/domain"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

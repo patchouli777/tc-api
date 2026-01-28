@@ -4,29 +4,41 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	appAuth "main/internal/app/auth"
-	authStorage "main/internal/auth/storage"
-	categoryService "main/internal/category/service"
-	categoryStorage "main/internal/category/storage"
-	channelStorage "main/internal/channel/storage"
-	authExternal "main/internal/external/auth"
-	"main/internal/external/streamserver"
-	followStorage "main/internal/follow/storage"
-	"main/internal/lib/mw"
-	"main/internal/lib/sl"
-	livestreamService "main/internal/livestream/service"
-	livestreamStorage "main/internal/livestream/storage"
-	userStorage "main/internal/user/storage"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+	appAuth "twitchy-api/internal/app/auth"
+	authStorage "twitchy-api/internal/auth/storage"
+	categoryService "twitchy-api/internal/category/service"
+	categoryStorage "twitchy-api/internal/category/storage"
+	channelStorage "twitchy-api/internal/channel/storage"
+	authExternal "twitchy-api/internal/external/auth"
+	"twitchy-api/internal/external/streamserver"
+	"twitchy-api/internal/external/taskqueue"
+	followStorage "twitchy-api/internal/follow/storage"
+	"twitchy-api/internal/lib/mw"
+	"twitchy-api/internal/lib/sl"
+	livestreamService "twitchy-api/internal/livestream/service"
+	livestreamStorage "twitchy-api/internal/livestream/storage"
+	userStorage "twitchy-api/internal/user/storage"
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/redis/go-redis/v9/maintnotifications"
+	"golang.org/x/sync/errgroup"
 )
 
-func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
+func Run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	cfg := GetConfig()
+	log := NewLogger(cfg.Logger)
+	slog.SetDefault(log)
+
 	redisAddr := fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port)
 	rdb := redis.NewClient(&redis.Options{
 		// https://github.com/redis/go-redis/issues/3536
@@ -48,29 +60,22 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 	pool, err := pgxpool.New(ctx, postgresConnURL)
 	if err != nil {
 		log.Error("unable to create connection pool", sl.Err(err))
-		return nil
+		return err
 	}
 
-	authClient, err := NewAuthClient(log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
+	app, err := NewApp(log, rdb, pool, cfg)
 	if err != nil {
-		log.Error("unable to initialize auth client", sl.Err(err))
-		return nil
+		log.Error("unable to create app", sl.Err(err))
+		return err
 	}
 
-	app := NewApp(ctx,
-		log,
-		rdb,
-		pool,
-		authClient,
-		cfg.Env,
-		cfg.InstanceID.String(),
-		cfg.StreamServer,
-		cfg.Asynq)
-
-	InitApp(ctx, log, rdb, cfg.InstanceID.String(), app, cfg.Update, cfg.StreamServer)
+	// spins up task queue and updaters
+	// TODO: shutdown everyhthing if any fails?
+	eg, ctx := errgroup.WithContext(ctx)
+	app.Init(ctx, cfg.Update, eg)
 
 	authMw := NewAuthMiddleware(log, cfg.AuthMiddlewareMock)
-	handler := CreateHandler(ctx, log, authMw, app)
+	handler := app.CreateHandler(authMw)
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", cfg.HTTP.Host, cfg.HTTP.Port),
 		Handler:      handler,
@@ -78,92 +83,48 @@ func New(ctx context.Context, log *slog.Logger, cfg Config) *http.Server {
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout}
 
-	return server
-}
-
-// spins up workers, subscribes to stream server event and stuff
-func InitApp(ctx context.Context, log *slog.Logger, r *redis.Client, instanceID string, app *App, updCfg UpdateConfig, ssCfg StreamServerConfig) {
-	asyncqMux := asynq.NewServeMux()
-	updSched := livestreamService.NewUpdateScheduler(log, r, app.StreamServerAdapter, app.LivestreamRepo, app.TaskScheduler, instanceID)
-	asyncqMux.HandleFunc(livestreamService.TaskTypeUpdate, updSched.HandleUpdateTask)
-
 	go func() {
-		if err := app.TaskQServer.Run(asyncqMux); err != nil {
-			log.Error("asynq server down", sl.Err(err))
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("server down", sl.Err(err))
+			stop()
 		}
 	}()
 
-	go func() {
-		if err := app.TaskScheduler.Run(); err != nil {
-			log.Error("scheduler down", sl.Err(err))
-		}
-	}()
+	<-ctx.Done()
+	log.Info("shutting down...")
+	shutdownCtx, cancelTimeout := context.WithTimeout(ctx, 3*time.Second)
+	defer cancelTimeout()
 
-	app.CategoryUpdater.Update(ctx, updCfg.CategoriesTimeout)
-	go updSched.Run(ctx, updCfg.LivestreamsTimeout)
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Error("can't shutdown gracefully", sl.Err(err))
+		stop()
+	}
 
-	// TODO: events
-	// cl := baseclient.NewClient()
-	// ssURL := fmt.Sprintf("http://%s:%s%s/", ssCfg.Host, ssCfg.Port, ssCfg.Endpoint)
-	// req, err := cl.Post(ssURL+"/subscribe",
-	// 	streamserver.SubscribeRequest{CallbackURL: "/webhooks/livestreams"})
-	// if err != nil {
-	// 	log.Error("big error 1", sl.Err(err))
-	// }
+	log.Info("server shut down gracefully")
 
-	// resp, err := cl.Client.Do(req)
-	// if err != nil {
-	// 	log.Error("big error 2", sl.Err(err))
-	// }
-
-	// var subr streamserver.SubscribeResponse
-	// err = json.NewDecoder(resp.Body).Decode(&subr)
-	// if err != nil {
-	// 	log.Error("big error 3", sl.Err(err))
-	// }
-	// fmt.Println(subr)
-}
-
-func CreateHandler(ctx context.Context, log *slog.Logger, authMw authMw, app *App) http.Handler {
-	mux := http.NewServeMux()
-
-	addRoutes(mux, log,
-		authMw,
-		app.CategoryRepo,
-		app.LivestreamRepo,
-		app.ChannelRepo,
-		app.AuthService,
-		app.FollowRepo,
-		app.UserRepo)
-
-	panicRecovery := mw.PanicRecovery(log)
-	logging := mw.Logging(log)
-	return mw.RequestID(panicRecovery(mw.JSONResponse(mw.CORS(logging(mux)))))
+	return err
 }
 
 type App struct {
+	log                 *slog.Logger
 	AuthService         *authStorage.ServiceImpl
-	LivestreamRepo      *livestreamStorage.RepositoryImpl
-	CategoryRepo        *categoryStorage.RepositoryImpl
 	StreamServerAdapter *streamserver.Adapter
+	LivestreamRepo      *livestreamStorage.RepositoryImpl
+	LivestreamUpdater   *livestreamService.Updater
+	CategoryRepo        *categoryStorage.RepositoryImpl
 	CategoryUpdater     *categoryService.CategoryUpdater
 	FollowRepo          *followStorage.RepositoryImpl
 	UserRepo            *userStorage.RepositoryImpl
 	ChannelRepo         *channelStorage.RepositoryImpl
 	TaskQServer         *asynq.Server
-	TaskScheduler       *asynq.Scheduler
+	TaskScheduler       *taskqueue.Scheduler
 }
 
-// initialize pgx, redis and auth client outside because of tests
-func NewApp(ctx context.Context,
-	log *slog.Logger,
+// initialize pgx and redis outside because of tests
+func NewApp(log *slog.Logger,
 	rdb *redis.Client,
 	pool *pgxpool.Pool,
-	client authStorage.Client,
-	env string,
-	instanceID string,
-	ssCfg StreamServerConfig,
-	asynqCfg AsynqConfig) *App {
+	cfg Config) (*App, error) {
 	livestreamRepo := livestreamStorage.NewRepo(rdb, pool)
 
 	channelRepo := channelStorage.NewRepository(pool)
@@ -171,23 +132,38 @@ func NewApp(ctx context.Context,
 	categoryRepo := categoryStorage.NewRepo(rdb, pool)
 	categoryUpdater := categoryService.NewUpdater(log, livestreamRepo, categoryRepo)
 
-	authService := authStorage.NewService(client, pool)
+	authClient, err := NewAuthClient(log, cfg.Env, cfg.AuthServiceMock, cfg.GRPC)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize auth client: %v", err)
+	}
+	authService := authStorage.NewService(authClient, pool)
 
 	followRepo := followStorage.NewRepository(pool)
 
 	userRepo := userStorage.NewRepository(pool)
 
-	ssURL := fmt.Sprintf("http://%s:%s%s/", ssCfg.Host, ssCfg.Port, ssCfg.Endpoint)
-	streamServerAdapter := streamserver.NewAdapter(log, ssURL)
+	ssURL := fmt.Sprintf("http://%s:%s%s/",
+		cfg.StreamServer.Host, cfg.StreamServer.Port, cfg.StreamServer.Endpoint)
+	streamServerAdapter := streamserver.NewAdapter(ssURL)
 
-	asyncRedis := fmt.Sprintf("%s:%s", asynqCfg.RedisHost, asynqCfg.RedisPort)
+	asyncRedis := fmt.Sprintf("%s:%s", cfg.Asynq.RedisHost, cfg.Asynq.RedisPort)
 	taskqserv := asynq.NewServer(asynq.RedisClientOpt{Addr: asyncRedis},
-		asynq.Config{Concurrency: asynqCfg.MaxConcurrentTasks})
-	sched := asynq.NewScheduler(asynq.RedisClientOpt{Addr: asyncRedis}, nil)
+		asynq.Config{Concurrency: cfg.Asynq.MaxConcurrentTasks})
+	sc := asynq.NewScheduler(asynq.RedisClientOpt{Addr: asyncRedis}, nil)
+	sched := taskqueue.NewScheduler(sc)
+
+	livestreamUpdater := livestreamService.NewUpdater(log,
+		rdb,
+		streamServerAdapter,
+		livestreamRepo,
+		sched,
+		cfg.InstanceID.String())
 
 	return &App{
+		log:                 log,
 		AuthService:         authService,
 		LivestreamRepo:      livestreamRepo,
+		LivestreamUpdater:   livestreamUpdater,
 		ChannelRepo:         channelRepo,
 		CategoryRepo:        categoryRepo,
 		CategoryUpdater:     categoryUpdater,
@@ -195,17 +171,66 @@ func NewApp(ctx context.Context,
 		UserRepo:            userRepo,
 		StreamServerAdapter: streamServerAdapter,
 		TaskQServer:         taskqserv,
-		TaskScheduler:       sched}
+		TaskScheduler:       sched}, nil
 }
 
-type authMw = func(log *slog.Logger, next http.HandlerFunc) http.HandlerFunc
+func (a *App) Init(ctx context.Context, cfg UpdateConfig, eg *errgroup.Group) {
+	asyncqMux := asynq.NewServeMux()
+	asyncqMux.HandleFunc(livestreamService.TaskUpdate,
+		taskqueue.TaskHandler(a.LivestreamUpdater.HandleUpdateTask))
 
-func NewAuthMiddleware(log *slog.Logger, isMock bool) authMw {
+	eg.Go(func() error {
+		err := a.TaskQServer.Run(asyncqMux)
+		if err != nil {
+			a.log.Error("asynq server down", sl.Err(err))
+		}
+
+		return err
+	})
+
+	eg.Go(func() error {
+		err := a.TaskScheduler.Run()
+		if err != nil {
+			a.log.Error("scheduler down", sl.Err(err))
+		}
+
+		return err
+	})
+
+	eg.Go(func() error {
+		return a.CategoryUpdater.Run(ctx, cfg.CategoriesTimeout)
+	})
+
+	eg.Go(func() error {
+		return a.LivestreamUpdater.Run(ctx, cfg.LivestreamsTimeout)
+	})
+}
+
+func (a *App) CreateHandler(authMw mware) http.Handler {
+	mux := http.NewServeMux()
+
+	addRoutes(mux, a.log,
+		authMw,
+		a.CategoryRepo,
+		a.LivestreamRepo,
+		a.ChannelRepo,
+		a.AuthService,
+		a.FollowRepo,
+		a.UserRepo)
+
+	panicRecovery := mw.PanicRecovery(a.log)
+	logging := mw.Logging(a.log)
+	return mw.RequestID(panicRecovery(mw.JSONResponse(mw.CORS(logging(mux)))))
+}
+
+type mware = func(next http.HandlerFunc) http.HandlerFunc
+
+func NewAuthMiddleware(log *slog.Logger, isMock bool) mware {
 	if isMock {
 		log.Info("Initializating mock auth middleware because AUTH_MIDDLEWARE_MOCK == true")
-		return appAuth.AuthMiddlewareMock
+		return appAuth.AuthMiddlewareMock(log)
 	} else {
-		return appAuth.AuthMiddleware
+		return appAuth.AuthMiddleware(log)
 	}
 }
 
@@ -247,7 +272,15 @@ func NewLogger(cfg LoggerConfig) *slog.Logger {
 	var h slog.Handler
 	switch cfg.Handler {
 	case "text":
-		h = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: lev})
+		h = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: lev,
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				if a.Key == slog.TimeKey {
+					t := a.Value.Time()
+					a.Value = slog.StringValue(t.Format(time.DateTime))
+				}
+				return a
+			}})
 	case "json":
 		h = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lev})
 	default:

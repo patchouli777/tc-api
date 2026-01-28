@@ -3,8 +3,8 @@ package follow
 import (
 	"context"
 	"fmt"
-	"main/internal/external/db"
-	d "main/internal/follow/domain"
+	"twitchy-api/internal/external/db"
+	d "twitchy-api/internal/follow/domain"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"

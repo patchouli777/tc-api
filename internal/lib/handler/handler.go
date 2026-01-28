@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"main/internal/lib/sl"
 	"net/http"
+	"twitchy-api/internal/lib/sl"
 )
 
 type ErrorResponse struct {

@@ -2,6 +2,8 @@ package app
 
 import (
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,10 +31,28 @@ type Config struct {
 	AuthMiddlewareMock bool `env:"AUTH_MIDDLEWARE_MOCK" env-default:"false"`
 }
 
+func GetProjectRoot() string {
+	dir, _ := os.Getwd()
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return dir
+}
+
 func GetConfig() Config {
 	var cfg Config
 
-	err := cleanenv.ReadConfig(".env", &cfg)
+	root := GetProjectRoot()
+	err := cleanenv.ReadConfig(root+"/.env", &cfg)
 	if err != nil {
 		log.Fatalf("config big bad: %v", err)
 	}

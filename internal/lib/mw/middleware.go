@@ -3,12 +3,13 @@ package mw
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
-	"main/internal/lib/handler"
 	"net/http"
 	"runtime/debug"
 	"strings"
 	"time"
+	"twitchy-api/internal/lib/handler"
 
 	"github.com/google/uuid"
 )
@@ -29,7 +30,7 @@ func Logging(log *slog.Logger) func(http.Handler) http.Handler {
 			log.LogAttrs(ctx, slog.LevelInfo, "request",
 				slog.String("method", req.Method),
 				slog.String("uri", req.RequestURI),
-				slog.String("time", time.Since(start).String()),
+				slog.String("done_in", time.Since(start).String()),
 				slog.String("request_id", id))
 		})
 	}
@@ -67,6 +68,9 @@ func PanicRecovery(log *slog.Logger) func(http.Handler) http.Handler {
 			defer func() {
 				if rcv := recover(); rcv != nil {
 					log.Error("recover after panic: %v\n. stack trace:\n%s", rcv, debug.Stack())
+					fmt.Println("----------------------------")
+					debug.PrintStack()
+					fmt.Println("----------------------------")
 					w.WriteHeader(http.StatusInternalServerError)
 					json.NewEncoder(w).Encode(handler.ErrorResponse{Success: false, Errors: map[string]string{"unknown": "internal error"}})
 					return

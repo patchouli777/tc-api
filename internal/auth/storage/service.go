@@ -3,9 +3,9 @@ package storage
 import (
 	"context"
 	"errors"
-	d "main/internal/auth/domain"
-	ext "main/internal/external/auth"
-	"main/internal/external/db"
+	d "twitchy-api/internal/auth/domain"
+	ext "twitchy-api/internal/external/auth"
+	"twitchy-api/internal/external/db"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

@@ -3,13 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"log"
 	"os"
 
-	"main/internal/app"
-	"main/internal/external/auth"
-	"main/internal/lib/setup"
-	"main/internal/lib/sl"
+	"twitchy-api/internal/app"
+	"twitchy-api/internal/lib/setup"
+	"twitchy-api/internal/lib/sl"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -18,8 +17,7 @@ import (
 
 func main() {
 	cfg := app.GetConfig()
-	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-
+	logger := app.NewLogger(cfg.Logger)
 	ctx := context.Background()
 
 	rdb := redis.NewClient(&redis.Options{
@@ -41,21 +39,17 @@ func main() {
 
 	pool, err := pgxpool.New(ctx, postgresConnURL)
 	if err != nil {
-		log.Error("unable to create connection pool", sl.Err(err))
-		os.Exit(1)
+		logger.Error("unable to create connection pool", sl.Err(err))
+		log.Fatalf("unable to create connection pool: %v", err)
 	}
 
 	setup.RecreateSchema(pool, rdb)
 
-	app := app.NewApp(ctx,
-		log,
-		rdb,
-		pool,
-		&auth.ClientMock{},
-		cfg.Env,
-		cfg.InstanceID.String(),
-		cfg.StreamServer,
-		cfg.Asynq)
+	app, err := app.NewApp(logger, rdb, pool, cfg)
+	if err != nil {
+		logger.Error("unable to create app", sl.Err(err))
+		log.Fatalf("unable to create app: %v", err)
+	}
 
 	streamServerBaseUrl := fmt.Sprintf("http://%s:%s%s", cfg.StreamServer.Host, cfg.StreamServer.Port, cfg.StreamServer.Endpoint)
 	setup.Populate(ctx, pool,

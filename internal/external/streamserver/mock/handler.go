@@ -3,9 +3,9 @@ package mock
 import (
 	"encoding/json"
 	"fmt"
-	"main/internal/external/streamserver"
-	baseclient "main/pkg/api/client"
 	"net/http"
+	"twitchy-api/internal/external/streamserver"
+	baseclient "twitchy-api/pkg/api/client"
 )
 
 type serverState struct {

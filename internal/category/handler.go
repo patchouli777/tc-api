@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"main/internal/app/auth"
-	d "main/internal/category/domain"
-	"main/internal/lib/handler"
-	api "main/pkg/api/category"
 	"net/http"
 	"strconv"
+	"twitchy-api/internal/app/auth"
+	d "twitchy-api/internal/category/domain"
+	"twitchy-api/internal/lib/handler"
+	api "twitchy-api/pkg/api/category"
 )
 
 type Getter interface {
@@ -185,8 +185,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	const op = "creating category"
 
 	ctx := r.Context()
-	cl := ctx.Value(auth.AuthContextKey{})
-	user, ok := cl.(*auth.Claims)
+	user, ok := auth.FromContext(ctx)
 
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
@@ -246,10 +245,9 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 //	@Router			/categories/{identifier} [patch]
 func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	const op = "updating category"
-	ctx := r.Context()
 
-	cl := ctx.Value(auth.AuthContextKey{})
-	user, ok := cl.(*auth.Claims)
+	ctx := r.Context()
+	user, ok := auth.FromContext(ctx)
 
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
@@ -333,15 +331,14 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	const op = "deleting category"
 
 	ctx := r.Context()
-	cl := ctx.Value(auth.AuthContextKey{})
-	claims, ok := cl.(*auth.Claims)
+	user, ok := auth.FromContext(ctx)
 
 	if !ok {
 		handler.Error(h.log, w, op, handler.ErrClaims, http.StatusBadRequest, handler.MsgIdentity)
 		return
 	}
 
-	if claims.Role != auth.RoleStaff {
+	if user.Role != auth.RoleStaff {
 		handler.Error(h.log, w, op, handler.ErrNotAllowed, http.StatusBadRequest, handler.ErrNotAllowed.Error())
 		return
 	}

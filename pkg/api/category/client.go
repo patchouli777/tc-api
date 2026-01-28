@@ -2,9 +2,8 @@ package category
 
 import (
 	"encoding/json"
-	"log/slog"
-	baseclient "main/pkg/api/client"
 	"net/http"
+	baseclient "twitchy-api/pkg/api/client"
 )
 
 type Client struct {
@@ -12,7 +11,7 @@ type Client struct {
 	BaseURL string
 }
 
-func NewClient(log *slog.Logger, url string) *Client {
+func NewClient(url string) *Client {
 	return &Client{
 		base:    baseclient.NewClient(),
 		BaseURL: url}

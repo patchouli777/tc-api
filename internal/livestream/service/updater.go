@@ -4,17 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
-	"main/internal/external/streamserver"
-	"main/internal/lib/sl"
-	d "main/internal/livestream/domain"
 	"math/rand"
 	"os"
 	"strconv"
 	"time"
+	"twitchy-api/internal/external/streamserver"
+	"twitchy-api/internal/lib/sl"
+	d "twitchy-api/internal/livestream/domain"
 
-	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -27,23 +25,22 @@ type Store interface {
 }
 
 // TODO: add polling count, polling timeout to config
-type UpdateScheduler struct {
-	log   *slog.Logger
-	ssa   *streamserver.Adapter
-	lsr   Store
-	sched *asynq.Scheduler
-
+type Updater struct {
+	log        *slog.Logger
+	ssa        *streamserver.Adapter
+	lsr        Store
+	sched      scheduler
 	previews   []os.DirEntry
 	instanceID string
 	rdb        *redis.Client
 }
 
-func NewUpdateScheduler(log *slog.Logger,
+func NewUpdater(log *slog.Logger,
 	rdb *redis.Client,
 	ssa *streamserver.Adapter,
 	lsr Store,
-	sched *asynq.Scheduler,
-	instanceID string) *UpdateScheduler {
+	sched scheduler,
+	instanceID string) *Updater {
 	entries, err := os.ReadDir("./static/livestreamthumbs")
 	if err != nil {
 		log.Error("Unable to read ./static/livestreamthumbs. Cancelling updates for livestreams.", sl.Err(err))
@@ -52,7 +49,7 @@ func NewUpdateScheduler(log *slog.Logger,
 
 	log = log.With(slog.String("instance_id", instanceID))
 
-	return &UpdateScheduler{
+	return &Updater{
 		log:        log,
 		ssa:        ssa,
 		lsr:        lsr,
@@ -63,38 +60,35 @@ func NewUpdateScheduler(log *slog.Logger,
 }
 
 // TODO: ttl
-func (s *UpdateScheduler) Run(ctx context.Context, timeout time.Duration) {
+func (s *Updater) Run(ctx context.Context, timeout time.Duration) error {
 	err := s.startup(ctx)
 	if err != nil {
 		s.log.Info("startup", sl.Err(err))
+		return err
 	}
 
-	go func() {
-		err := s.PollSRS(ctx)
-		if err != nil {
-			s.log.Error("poll srs", sl.Err(err))
-		}
-	}()
+	err = s.pollSRS(ctx)
+	if err != nil {
+		s.log.Error("poll srs", sl.Err(err))
+		return err
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-time.Tick(timeout):
-			go func() {
-				err := s.PollSRS(ctx)
-				if err != nil {
-					s.log.Error("poll srs", sl.Err(err))
-					return
-				}
-				s.log.Info(fmt.Sprintf("Livestreams updated. Next in %v", timeout))
-			}()
+			err := s.pollSRS(ctx)
+			if err != nil {
+				s.log.Error("poll srs", sl.Err(err))
+				return err
+			}
 		}
 	}
 }
 
 const (
-	TaskTypeUpdate = "livestream:update"
+	TaskUpdate = "livestream:update"
 )
 
 type updateTaskPayload struct {
@@ -103,7 +97,7 @@ type updateTaskPayload struct {
 }
 
 // polls srs and registers new update tasks
-func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
+func (s *Updater) pollSRS(ctx context.Context) error {
 	lockValue := s.instanceID + ":" + strconv.FormatInt(time.Now().Unix(), 10)
 
 	ok, err := s.rdb.SetNX(ctx, "srs_lock", lockValue, 30*time.Second).Result()
@@ -119,6 +113,10 @@ func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
 	start := 0
 	count := 500
 	for moreStreams {
+		s.log.Debug("polling srs",
+			slog.Int("start", start),
+			slog.Int("count", count))
+
 		resp, err := s.ssa.List(ctx, start, count)
 		if err != nil {
 			return err
@@ -155,15 +153,11 @@ func (s *UpdateScheduler) PollSRS(ctx context.Context) error {
 	return nil
 }
 
-func (s *UpdateScheduler) HandleUpdateTask(ctx context.Context, t *asynq.Task) error {
+func (s *Updater) HandleUpdateTask(ctx context.Context, payload []byte) error {
 	var p updateTaskPayload
-	if err := json.Unmarshal(t.Payload(), &p); err != nil {
+	if err := json.Unmarshal(payload, &p); err != nil {
 		return err
 	}
-	s.log.Debug("Handling update task",
-		slog.String("user", p.Username),
-		slog.Int("id", p.LivestreamID))
-
 	resp, err := s.ssa.Get(ctx, p.Username)
 	if err != nil {
 		return err
@@ -192,14 +186,15 @@ func (s *UpdateScheduler) HandleUpdateTask(ctx context.Context, t *asynq.Task) e
 	return nil
 }
 
-func (s *UpdateScheduler) startup(ctx context.Context) error {
+func (s *Updater) startup(ctx context.Context) error {
 	moreStreams := true
 	page := 1
 	count := 500
 	for moreStreams {
 		livestreams, err := s.lsr.List(ctx, d.LivestreamSearch{
-			Page:  page,
-			Count: count,
+			Category: "dota-2",
+			Page:     page,
+			Count:    count,
 		})
 		if err != nil {
 			return err
@@ -219,7 +214,15 @@ func (s *UpdateScheduler) startup(ctx context.Context) error {
 	return nil
 }
 
-func (s *UpdateScheduler) newTask(ls *d.Livestream) error {
+type scheduler interface {
+	Schedule(every time.Duration, taskType string, payload []byte, taskId string) (string, error)
+}
+
+func (s *Updater) newTask(ls *d.Livestream) error {
+	s.log.Debug("scheduling update task",
+		slog.Int("livestream_id", ls.Id),
+		slog.String("channel", ls.UserName))
+
 	payload, err := json.Marshal(updateTaskPayload{LivestreamID: ls.Id, Username: ls.UserName})
 	if err != nil {
 		return err
@@ -227,7 +230,7 @@ func (s *UpdateScheduler) newTask(ls *d.Livestream) error {
 
 	// TODO: save {entry: entryId, livestream: ls.Id} to delete task later
 	// register new task with taskId = asynq.TaskID to make sure there is no duplicate update tasks for a given livestream
-	_, err = s.sched.Register("@every 15s", asynq.NewTask(TaskTypeUpdate, payload), asynq.TaskID(strconv.Itoa(ls.Id)))
+	_, err = s.sched.Schedule(time.Second*15, TaskUpdate, payload, strconv.Itoa(ls.Id))
 	if err != nil {
 		return err
 	}

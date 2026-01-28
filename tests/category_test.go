@@ -1,9 +1,12 @@
 package test
 
 import (
-	"encoding/json"
-	api "main/pkg/api/category"
+	"context"
+	"fmt"
 	"net/http"
+	"testing"
+	"twitchy-api/internal/lib/setup"
+	api "twitchy-api/pkg/api/category"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -14,99 +17,69 @@ type CategoryHandlerTestSuite struct {
 }
 
 func (s *CategoryHandlerTestSuite) SetupSuite() {
-	s.cl = api.NewClient(log, ts.URL+"/api/categories/")
+	ctx := context.Background()
+	s.cl = api.NewClient(ts.URL + "/api/categories/")
+
+	setup.AddTags(ctx, pgpool)
+	setup.AddCategories(ctx, app.CategoryRepo)
 }
 
-func (s *CategoryHandlerTestSuite) TestGetCategory() {
-	resp, err := s.cl.Get("path-of-not-existing-category")
+func (s *CategoryHandlerTestSuite) TearDownSuite() {}
+
+func TestCategoryHandlerSuite(t *testing.T) {
+	suite.Run(t, new(CategoryHandlerTestSuite))
+}
+
+func (s *CategoryHandlerTestSuite) TestCategoryNotFound() {
+	ctx := context.Background()
+
+	// get by link
+	nonExistent := "path-of-not-existing-category"
+	resp, err := s.cl.Get(nonExistent)
 	if err != nil {
 		s.Fail("unable to send request %v", err)
 	}
+
 	s.Equal(http.StatusNotFound, resp.StatusCode)
+	c, err := app.CategoryRepo.GetByLink(ctx, nonExistent)
+	s.Error(err)
+	s.Nil(c)
 
-	resp, err = s.cl.Get("999999999")
+	// get by id
+	nonExistentId := 999999999
+	resp, err = s.cl.Get(fmt.Sprintf("%d", nonExistentId))
 	if err != nil {
 		s.Fail("unable to send request %v", err)
 	}
+
 	s.Equal(http.StatusNotFound, resp.StatusCode)
+	c, err = app.CategoryRepo.Get(ctx, nonExistentId)
+	s.Error(err)
+	s.Nil(c)
 }
 
-func (s *CategoryHandlerTestSuite) TestGetCategory_ID() {
-	resp, err := s.cl.Get("1")
-	if err != nil {
-		s.Fail("unable to send request %v", err)
-	}
-	s.Equal(http.StatusAccepted, resp.StatusCode)
+func (s *CategoryHandlerTestSuite) TestCategoryFound() {
+	ctx := context.Background()
 
-	var res api.GetResponse
-	if err = json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		s.Fail("unable to parse response %v", err)
-	}
+	res, err := s.cl.GetById("1")
+	s.NoError(err)
 
-	category := res.Category
-	link := category.Link
-	s.Equal(int32(1), category.Id)
-	s.Len(category.Tags, 2)
+	categoryById := res.Category
+	s.Equal(1, categoryById.Id)
 
-	resp, err = s.cl.Get(link)
-	if err != nil {
-		s.Fail("unable to send request %v", err)
-	}
-	s.Equal(http.StatusAccepted, resp.StatusCode)
+	sameCategoryFromRepo, err := app.CategoryRepo.Get(ctx, 1)
+	s.NoError(err)
+	s.Equal(categoryById.Link, sameCategoryFromRepo.Link)
+	s.Equal(categoryById.Id, int(sameCategoryFromRepo.Id))
 
-	var sameRes api.GetResponse
-	if err = json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		s.Fail("unable to parse response %v", err)
-	}
+	res, err = s.cl.GetByLink("apex")
+	s.NoError(err)
 
-	sameCategory := sameRes.Category
-	s.Equal(category, sameCategory)
+	categoryByLink := res.Category
+	s.Equal("apex", categoryByLink.Link)
+
+	sameCategoryFromRepo, err = app.CategoryRepo.GetByLink(ctx, "apex")
+	s.NoError(err)
+	s.Equal(categoryByLink.Id, int(sameCategoryFromRepo.Id))
+	s.Equal(categoryByLink.Link, sameCategoryFromRepo.Link)
 }
-
-// func TestGetCategory_Link(t *testing.T) {
-// 	client := api.NewClient(testLog, server.URL+"/api/categories")
-// 	ctx := context.Background()
-
-// 	// Test link lookup
-// 	cat, err := client.GetByLink(ctx, "path-of-exile")
-// 	require.NoError(t, err)
-// 	assert.Equal(t, int32(123), cat.Category.Id)
-// 	assert.Equal(t, "Path of Exile", cat.Category.Name)
-
-// 	// Test invalid link (not found)
-// 	_, err = client.GetByLink(ctx, "nonexistent")
-// 	require.Error(t, err)
-// 	assert.Equal(t, http.StatusNotFound, client.lastStatus)
-// }
-
-// func TestGetCategory_TagConversion(t *testing.T) {
-// 	server := setupTestServer(t)
-// 	defer server.Close()
-
-// 	// // Setup repo mock with CategoryTags
-// 	// mockRepo.EXPECT().GetByLink(...).Return(&repo.Category{
-// 	//     Id:        1,
-// 	//     Tags:      repo.CategoryTags{{Id: 10, Name: "action"}, {Id: 20, Name: "rpg"}},
-// 	//     // ... other fields
-// 	// }, nil)
-
-// 	client := api.NewClient(testLog, server.URL+"/api/categories")
-// 	cat, err := client.GetByLink(context.Background(), "test")
-// 	require.NoError(t, err)
-
-// 	// Verify internal CategoryTags → c.CategoryTag conversion
-// 	assert.Len(t, cat.Category.Tags, 2)
-// 	assert.Equal(t, c.CategoryTag{Id: 10, Name: "action"}, cat.Category.Tags[0])
-// }
-
-// func TestGetCategory_InvalidIdentifier(t *testing.T) {
-// 	server := setupTestServer(t)
-// 	defer server.Close()
-
-// 	resp, err := http.Get(server.URL + "/api/categories/invalid")
-// 	require.NoError(t, err)
-// 	assert.Equal(t, http.StatusOK, resp.StatusCode) // Tries atoi first, then link
-
-// 	// If both fail → 404 (repo returns errNotFound)
-// 	// Mock repo to return errNotFound for "invalid"
-// }

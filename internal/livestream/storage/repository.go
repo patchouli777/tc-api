@@ -2,9 +2,9 @@ package storage
 
 import (
 	"context"
-	"errors"
-	"main/internal/external/db"
-	d "main/internal/livestream/domain"
+	"fmt"
+	"twitchy-api/internal/external/db"
+	d "twitchy-api/internal/livestream/domain"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,10 +32,14 @@ func (r *RepositoryImpl) Get(ctx context.Context, id int) (*d.Livestream, error)
 }
 
 func (r *RepositoryImpl) GetByUsername(ctx context.Context, username string) (*d.Livestream, error) {
-	return nil, errors.New("not implemented")
+	id, err := r.cache.userMap.get(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("%s's livestream not found: %v", username, err)
+	}
+
+	return r.cache.get(ctx, id)
 }
 
-// TODO: category id is 0
 func (r *RepositoryImpl) List(ctx context.Context, s d.LivestreamSearch) ([]d.Livestream, error) {
 	return r.cache.list(ctx, s.Category, s.Page, s.Count)
 }

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	d "main/internal/category/domain"
 	"strconv"
+	d "twitchy-api/internal/category/domain"
 
 	"github.com/redis/go-redis/v9"
 )

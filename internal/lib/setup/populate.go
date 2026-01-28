@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	authStorage "main/internal/auth/storage"
-	categoryDomain "main/internal/category/domain"
-	categoryStorage "main/internal/category/storage"
-	"main/internal/external/streamserver"
-	streamservermock "main/internal/external/streamserver/mock"
-	followStorage "main/internal/follow/storage"
-	userStorage "main/internal/user/storage"
 	"time"
+	authStorage "twitchy-api/internal/auth/storage"
+	categoryDomain "twitchy-api/internal/category/domain"
+	categoryStorage "twitchy-api/internal/category/storage"
+	"twitchy-api/internal/external/streamserver"
+	streamservermock "twitchy-api/internal/external/streamserver/mock"
+	followStorage "twitchy-api/internal/follow/storage"
+	userStorage "twitchy-api/internal/user/storage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,16 +26,15 @@ func Populate(ctx context.Context,
 	fs *followStorage.RepositoryImpl,
 	us *userStorage.RepositoryImpl,
 	streamServerBaseUrl string) {
-
 	slog.Info("adding tags")
 	t := withTime(func() {
-		addTags(ctx, pool)
+		AddTags(ctx, pool)
 	})
 	slog.Info("tags added", slog.Duration("took", t))
 
 	slog.Info("adding categories")
 	t = withTime(func() {
-		addCategories(ctx, cr)
+		AddCategories(ctx, cr)
 	})
 	slog.Info("categories added", slog.Duration("took", t))
 
@@ -47,13 +46,13 @@ func Populate(ctx context.Context,
 
 	slog.Info("adding follows")
 	t = withTime(func() {
-		addFollows(ctx, fs)
+		AddFollows(ctx, fs)
 	})
 	slog.Info("follows added", slog.Duration("took", t))
 
 	slog.Info("starting livestreams")
 	t = withTime(func() {
-		startLivestreams(ls, streamServerBaseUrl)
+		StartLivestreams(ls, streamServerBaseUrl)
 	})
 	slog.Info("livestreams started", slog.Duration("took", t))
 }
@@ -64,7 +63,7 @@ func withTime(f func()) time.Duration {
 	return time.Since(now)
 }
 
-func addCategories(ctx context.Context, cr *categoryStorage.RepositoryImpl) {
+func AddCategories(ctx context.Context, cr *categoryStorage.RepositoryImpl) {
 	categoriesLen := min(categoriesCount, len(categories))
 	categories = categories[:categoriesLen]
 
@@ -91,7 +90,7 @@ func addUsers(ctx context.Context, pool *pgxpool.Pool) {
 	r.Close()
 }
 
-func startLivestreams(ls *streamserver.Adapter, baseUrl string) {
+func StartLivestreams(ls *streamserver.Adapter, baseUrl string) {
 	cl := streamservermock.NewStreamServerClient(baseUrl)
 
 	for i := range streamsCount {
@@ -102,7 +101,7 @@ func startLivestreams(ls *streamserver.Adapter, baseUrl string) {
 	}
 }
 
-func addTags(ctx context.Context, pool *pgxpool.Pool) {
+func AddTags(ctx context.Context, pool *pgxpool.Pool) {
 	r, err := pool.Query(ctx, tagsToSQL(tags))
 	if err != nil {
 		log.Fatalf("unable to add tags: %v", err)
@@ -111,7 +110,7 @@ func addTags(ctx context.Context, pool *pgxpool.Pool) {
 }
 
 // TODO: sql instead of repo
-func addFollows(ctx context.Context, fs *followStorage.RepositoryImpl) {
+func AddFollows(ctx context.Context, fs *followStorage.RepositoryImpl) {
 	for i := range followCount {
 		err := fs.Follow(ctx, "user1", fmt.Sprintf("user%d", i))
 		if err != nil {

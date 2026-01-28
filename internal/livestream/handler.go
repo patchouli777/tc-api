@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"main/internal/lib/handler"
-	d "main/internal/livestream/domain"
-	api "main/pkg/api/livestream"
 	"net/http"
 	"strconv"
+	"twitchy-api/internal/lib/handler"
+	d "twitchy-api/internal/livestream/domain"
+	api "twitchy-api/pkg/api/livestream"
 )
 
 type Getter interface {
@@ -37,17 +37,16 @@ func NewHandler(log *slog.Logger, r GetterLister) *Handler {
 
 // Get godoc
 //
-//	@Summary		Get livestream data
-//	@Description	Retrieve livestream information for a streamer
+//	@Summary		Get livestream by ID
+//	@Description	Retrieve a specific livestream by its ID
 //	@Tags			Livestreams
+//	@Accept			json
 //	@Produce		json
-//	@Param			username	path		string					true	"Streamer username"
-//	@Success		200			{object}	api.GetResponse			"Livestream data"
-//	@Failure		404			{object}	handler.ErrorResponse	"Livestream not found"
-//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
-//	@Router			/livestreams/{username} [get]
-//
-// TODO: update doc
+//	@Param			id	path		int	true	"Livestream ID"
+//	@Success		200	{object}	LivestreamGetResponse
+//	@Failure		400	{object}	ErrorResponse	"Invalid ID"
+//	@Failure		404	{object}	ErrorResponse	"Livestream not found"
+//	@Router			/livestreams/{id} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	const op = "getting livestream"
 
@@ -73,7 +72,17 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// TODO: update doc
+// Get godoc
+//
+//	@Summary		Get livestream by username
+//	@Description	Retrieve livestream for a specific user by username
+//	@Tags			Livestreams
+//	@Accept			json
+//	@Produce		json
+//	@Param			username	path		string	true	"Username"
+//	@Success		200			{object}	LivestreamGetResponse
+//	@Failure		404			{object}	ErrorResponse	"User livestream not found"
+//	@Router			/livestreams/username/{username} [get]
 func (h *Handler) GetByUsername(w http.ResponseWriter, r *http.Request) {
 	const op = "getting user livestream"
 
@@ -95,20 +104,19 @@ func (h *Handler) GetByUsername(w http.ResponseWriter, r *http.Request) {
 
 // List godoc
 //
-//	@Summary		List livestreams by category
-//	@Description	Get paginated list of livestreams filtered by category
+//	@Summary		List livestreams
+//	@Description	Get paginated list of livestreams with optional filtering
 //	@Tags			Livestreams
+//	@Accept			json
 //	@Produce		json
-//	@Param			category	query		string					false	"Category name"
-//	@Param			categoryId	query		string					false	"Category identifier"	minLength(1)
-//	@Param			page		query		int						false	"Page number"			default(1)	minimum(1)
-//	@Param			count		query		int						false	"Items per page"		default(10)	minimum(1)	maximum(100)
-//	@Success		200			{object}	api.ListResponse		"Paginated livestreams"
-//	@Failure		400			{object}	handler.ErrorResponse	"Missing category, invalid page/count"
-//	@Failure		500			{object}	handler.ErrorResponse	"Internal server error"
+//	@Param			page		query		string	false	"Page number (default: 1)"
+//	@Param			count		query		string	false	"Items per page (default: 10, min: 1)"
+//	@Param			category	query		string	false	"Category name filter"
+//	@Param			categoryId	query		string	false	"Category ID filter"
+//	@Success		200			{object}	ListResponse
+//	@Failure		400			{object}	ErrorResponse	"Invalid page or count parameters"
+//	@Failure		500			{object}	ErrorResponse	"Internal server error"
 //	@Router			/livestreams [get]
-//
-// TODO: update doc
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	const op = "getting livestreams"
 

@@ -3,7 +3,7 @@ package follow
 import (
 	"context"
 	"errors"
-	"main/internal/external/db"
+	"twitchy-api/internal/external/db"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )

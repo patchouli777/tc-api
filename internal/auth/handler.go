@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	d "main/internal/auth/domain"
-	"main/internal/lib/handler"
-	"main/internal/lib/sl"
-	api "main/pkg/api/auth"
 	"net/http"
 	"time"
+	d "twitchy-api/internal/auth/domain"
+	"twitchy-api/internal/lib/handler"
+	"twitchy-api/internal/lib/sl"
+	api "twitchy-api/pkg/api/auth"
 )
 
 type Service interface {
@@ -51,8 +51,6 @@ func (h Handler) SignIn(w http.ResponseWriter, r *http.Request) {
 
 	tokenPair, err := h.as.SignIn(r.Context(), request.Username, request.Password)
 	if err != nil {
-		h.log.Error(op, sl.Err(err))
-
 		if errors.Is(err, d.ErrWrongCredentials) {
 			handler.Error(h.log, w, op, err, http.StatusBadRequest, d.ErrWrongCredentials.Error())
 			return

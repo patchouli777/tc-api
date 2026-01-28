@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	auth_v1 "main/internal/lib/gen/auth"
+	auth_v1 "twitchy-api/internal/lib/gen/auth"
 
 	grpclog "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	grpcretry "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"

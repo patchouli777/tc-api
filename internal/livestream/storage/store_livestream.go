@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	d "main/internal/livestream/domain"
+	d "twitchy-api/internal/livestream/domain"
 
 	"github.com/redis/go-redis/v9"
 )

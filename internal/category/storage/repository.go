@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	d "main/internal/category/domain"
-	"main/internal/external/db"
+	d "twitchy-api/internal/category/domain"
+	"twitchy-api/internal/external/db"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"

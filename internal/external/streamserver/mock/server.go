@@ -4,20 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"main/internal/app"
-	"main/internal/lib/mw"
-	"main/internal/lib/sl"
-	baseclient "main/pkg/api/client"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
+	"twitchy-api/internal/app"
+	"twitchy-api/internal/lib/mw"
+	"twitchy-api/internal/lib/sl"
+	baseclient "twitchy-api/pkg/api/client"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
-func Run(ctx context.Context) error {
-	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
+func Run(ctx context.Context, log *slog.Logger) error {
+	if log == nil {
+		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
+	}
 
 	state := serverState{streams: newRepository(), cl: baseclient.NewClient()}
 	handler := handler{state: &state}
@@ -35,11 +37,12 @@ func Run(ctx context.Context) error {
 		}
 	}()
 
+	root := app.GetProjectRoot()
 	var cfg app.StreamServerConfig
-	err := cleanenv.ReadConfig(".env", &cfg)
+	err := cleanenv.ReadConfig(root+"/.env", &cfg)
 	if err != nil {
 		log.Error("config big bad", sl.Err(err))
-		os.Exit(1)
+		return err
 	}
 
 	apiMux := http.NewServeMux()

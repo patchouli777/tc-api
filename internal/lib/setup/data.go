@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"os"
+	"twitchy-api/internal/app"
 )
 
 var tags = []string{
@@ -97,29 +98,31 @@ type setupUser struct {
 }
 
 func usersGet(count int) []setupUser {
-	entries, err := os.ReadDir("./static/avatars")
+	root := app.GetProjectRoot()
+
+	entries, err := os.ReadDir(root + "/static/pfps")
 	if err != nil {
-		log.Print("couldn't load avatars")
+		log.Print("couldn't load pfps")
 	}
 
-	avatars := make([]string, len(entries))
+	pfps := make([]string, len(entries))
 	for i, entry := range entries {
-		avatars[i] = "avatars\\" + entry.Name()
+		pfps[i] = "pfps\\" + entry.Name()
 	}
 
-	if len(avatars) == 0 {
-		avatars = append(avatars, "couln't load avatars")
-	}
-
-	avsLen := len(avatars)
+	pfpsLen := len(pfps)
 	users := make([]setupUser, count)
 	for i := range count {
-		avId := rand.IntN(avsLen)
+		pfp := ""
+		if pfpsLen != 0 {
+			id := rand.IntN(pfpsLen)
+			pfp = pfps[id]
+		}
 
 		users[i] = setupUser{
 			Name:        fmt.Sprintf("user%d", i),
 			Password:    fmt.Sprintf("password%d", i),
-			Avatar:      avatars[avId],
+			Avatar:      pfp,
 			Description: fmt.Sprintf("description%d", i),
 			Links:       []string{"instagram", "telegram"},
 		}

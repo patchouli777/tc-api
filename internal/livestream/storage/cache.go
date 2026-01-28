@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	d "main/internal/livestream/domain"
+	d "twitchy-api/internal/livestream/domain"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -12,8 +12,10 @@ import (
 // TODO: ttl 10min for livestreams
 type cache struct {
 	rdb *redis.Client
-	// set of livestream ids sorted by viewers
+	// set of livestream ids in category sorted by viewers
 	sorted *sortedIDStore
+	// set of livestream ids sorted by viewers
+	sortedAll *sortedIDAllStore
 	// livestream store
 	store *livestreamStore
 	// map from username (channel) to livestream id
@@ -24,21 +26,24 @@ type cache struct {
 
 func newCache(rdb *redis.Client) *cache {
 	sorted := sortedIDStore{rdb: rdb}
+	sortedAll := sortedIDAllStore{rdb: rdb}
 	store := livestreamStore{rdb: rdb}
 	userMap := userToIdStore{rdb: rdb}
 	ids := idStore{rdb: rdb}
 
 	return &cache{rdb: rdb,
-		sorted:  &sorted,
-		store:   &store,
-		userMap: &userMap,
-		ids:     &ids}
+		sorted:    &sorted,
+		sortedAll: &sortedAll,
+		store:     &store,
+		userMap:   &userMap,
+		ids:       &ids}
 }
 
 func (r *cache) add(ctx context.Context, ls d.Livestream) error {
 	cmds, err := r.rdb.TxPipelined(ctx, func(p redis.Pipeliner) error {
 		r.userMap.addTx(ctx, p, ls.UserName, ls.Id)                // nolint:errcheck
 		r.sorted.addTx(ctx, p, ls.CategoryLink, ls.Viewers, ls.Id) // nolint:errcheck
+		r.sortedAll.addTx(ctx, p, ls.Viewers, ls.Id)               // nolint:errcheck
 		r.store.addTx(ctx, p, ls)                                  // nolint:errcheck
 		r.ids.addTx(ctx, p, ls.Id)                                 // nolint:errcheck
 		return nil
@@ -70,11 +75,20 @@ func (r *cache) get(ctx context.Context, id int) (*d.Livestream, error) {
 	return ls, nil
 }
 
-// TODO: if category is empty just list sorted (might need an additional store)
 func (r *cache) list(ctx context.Context, category string, page, count int) ([]d.Livestream, error) {
-	ids, err := r.sorted.get(ctx, category, page, count)
-	if err != nil {
-		return nil, err
+	var ids []int
+	var err error
+
+	if category == "" {
+		ids, err = r.sortedAll.get(ctx, page, count)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		ids, err = r.sorted.get(ctx, category, page, count)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	res, err := r.store.list(ctx, ids)
@@ -126,6 +140,7 @@ func (r *cache) updateViewers(ctx context.Context, id int, viewers int) error {
 
 	cmds, err := r.rdb.TxPipelined(ctx, func(p redis.Pipeliner) error {
 		r.sorted.addTx(ctx, p, ls.CategoryLink, viewers, id)
+		r.sortedAll.addTx(ctx, p, viewers, id)
 		r.store.updateViewers(ctx, id, int(viewers))
 		return nil
 	})
@@ -156,6 +171,7 @@ func (r *cache) delete(ctx context.Context, id int) error {
 	cmds, err := r.rdb.TxPipelined(ctx, func(p redis.Pipeliner) error {
 		r.userMap.deleteTx(ctx, p, ls.UserName)
 		r.sorted.deleteTx(ctx, p, ls.CategoryLink)
+		r.sortedAll.deleteTx(ctx, p)
 		r.store.deleteTx(ctx, p, id)
 		r.ids.deleteTx(ctx, p, id)
 		return nil

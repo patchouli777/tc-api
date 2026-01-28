@@ -2,8 +2,9 @@ package domain
 
 import (
 	"encoding/json"
-	"main/internal/lib/null"
-	api "main/pkg/api/livestream"
+	"strconv"
+	"twitchy-api/internal/lib/null"
+	api "twitchy-api/pkg/api/livestream"
 )
 
 type Livestream struct {
@@ -23,11 +24,15 @@ type Livestream struct {
 func (l *Livestream) ToGetResponse() api.GetResponse {
 	return api.GetResponse{
 		Id:        l.Id,
-		Username:  l.UserName,
-		Pfp:       l.UserPfp,
 		StartedAt: l.StartedAt,
 		Viewers:   l.Viewers,
+		Channel: api.LivestreamChannel{
+			Id:         strconv.Itoa(l.UserId),
+			Username:   l.UserName,
+			ProfilePic: l.UserPfp,
+		},
 		Category: api.LivestreamCategory{
+			Id:   l.CategoryId,
 			Link: l.CategoryLink,
 			Name: l.CategoryName,
 		},
@@ -42,10 +47,14 @@ func (l *Livestream) ToGetResponse() api.GetResponse {
 
 func (l *Livestream) ToListResponseItem() api.ListResponseItem {
 	return api.ListResponseItem{
-		Id:       l.Id,
-		Username: l.UserName,
-		Pfp:      l.UserPfp,
+		Id: l.Id,
+		Channel: api.LivestreamChannel{
+			Id:         strconv.Itoa(l.UserId),
+			Username:   l.UserName,
+			ProfilePic: l.UserPfp,
+		},
 		Category: api.LivestreamCategory{
+			Id:   l.CategoryId,
 			Name: l.CategoryName,
 			Link: l.CategoryLink,
 		},
@@ -102,25 +111,3 @@ func (m User) MarshalBinary() ([]byte, error) {
 func (m *User) UnmarshalBinary(data []byte) error {
 	return json.Unmarshal(data, m)
 }
-
-// type LivestreamCategory struct {
-// 	Id   int
-// 	Name string
-// 	Link string
-// }
-
-// type LivestreamUser struct {
-// 	Id   int
-// 	Name string
-// 	Pfp  string
-// }
-
-// type LivestreamEntity struct {
-// 	Id        int    `redis:"id"`
-// 	Title     string `redis:"title"`
-// 	Thumbnail string `redis:"thumbnail"`
-// 	Viewers   int    `redis:"viewers"`
-// 	StartedAt int    `redis:"started_at"`
-// 	User      LivestreamUser
-// 	Category  LivestreamCategory
-// }
